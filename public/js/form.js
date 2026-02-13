@@ -81,29 +81,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
 
-  // Convert an external image URL to a data URL (avoids CORS issues in html-to-image)
-  function urlToDataUrl(url, maxW, maxH) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        let w = img.width, h = img.height;
-        if (w > maxW || h > maxH) {
-          const ratio = Math.min(maxW / w, maxH / h);
-          w = Math.round(w * ratio);
-          h = Math.round(h * ratio);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        resolve(canvas.toDataURL('image/jpeg', 0.85));
-      };
-      img.onerror = () => resolve(url); // fallback to original URL
-      img.src = url;
-    });
-  }
-
   // File upload → base64
   document.getElementById('photo-file').addEventListener('change', async (e) => {
     const file = e.target.files[0];
@@ -160,7 +137,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           });
           const data = await res.json();
           if (data.image) {
-            photo = await urlToDataUrl(data.image, 480, 600);
+            photo = data.image;
           } else if (data.message) {
             status.textContent = data.message;
           }
@@ -186,9 +163,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           });
           if (enhanceRes.ok) {
             const enhanceData = await enhanceRes.json();
-            if (enhanceData.image) {
-              photo = await urlToDataUrl(enhanceData.image, 480, 600);
-            }
+            if (enhanceData.image) photo = enhanceData.image;
           }
         } catch (e) {
           // Enhancement failed — use original photo silently

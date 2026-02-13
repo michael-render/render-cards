@@ -95,7 +95,14 @@ router.post('/enhance-photo', async (req, res) => {
       quality: 'standard'
     });
 
-    res.json({ image: imageRes.data[0].url });
+    // Fetch the image and convert to base64 data URL to avoid client-side CORS issues
+    const imageUrl = imageRes.data[0].url;
+    const imgResp = await fetch(imageUrl);
+    const arrBuf = await imgResp.arrayBuffer();
+    const base64 = Buffer.from(arrBuf).toString('base64');
+    const dataUrl = `data:image/png;base64,${base64}`;
+
+    res.json({ image: dataUrl });
   } catch (err) {
     console.error('Photo enhancement error:', err.message);
     res.json({ image: null });
@@ -120,7 +127,14 @@ router.post('/generate-image', async (req, res) => {
       quality: 'standard'
     });
 
-    res.json({ image: response.data[0].url });
+    // Fetch the image and convert to base64 data URL to avoid client-side CORS issues
+    const imageUrl = response.data[0].url;
+    const imgResp = await fetch(imageUrl);
+    const arrBuf = await imgResp.arrayBuffer();
+    const base64 = Buffer.from(arrBuf).toString('base64');
+    const dataUrl = `data:image/png;base64,${base64}`;
+
+    res.json({ image: dataUrl });
   } catch (err) {
     console.error('Image generation error:', err.message);
     res.status(500).json({ error: 'Failed to generate image' });
