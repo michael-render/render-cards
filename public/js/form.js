@@ -121,6 +121,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
       }
 
+      // Enhance uploaded photo with AI vision + DALL-E
+      if (aiEnabled && photoDataUrl && photo === photoDataUrl) {
+        try {
+          status.textContent = 'Enhancing photo with AI...';
+          const enhanceRes = await fetch('/api/enhance-photo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ photo: photoDataUrl, name, title })
+          });
+          if (enhanceRes.ok) {
+            const enhanceData = await enhanceRes.json();
+            if (enhanceData.image) photo = enhanceData.image;
+          }
+        } catch (e) {
+          // Enhancement failed — use original photo silently
+        }
+      }
+
       // Generate stats
       status.textContent = 'Generating stats...';
       const statsRes = await fetch('/api/generate-stats', {
