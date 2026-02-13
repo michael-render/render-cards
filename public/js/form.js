@@ -76,7 +76,12 @@ document.addEventListener('DOMContentLoaded', async () => {
       document.getElementById('skill-2').value.trim()
     ].filter(Boolean);
 
-    if (!name || !title) return;
+    if (!name || !title || skills.length < 3) {
+      const status = document.getElementById('status');
+      status.textContent = 'Please fill in all fields including all 3 skills.';
+      status.className = 'status error';
+      return;
+    }
 
     const btn = document.getElementById('submit-btn');
     const status = document.getElementById('status');
