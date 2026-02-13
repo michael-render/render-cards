@@ -1,0 +1,218 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Raleway:wght@300;400;500;600&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: linear-gradient(170deg, #0a0a0f 0%, #12121a 50%, #0e0e16 100%);
+  min-height: 100vh;
+  font-family: 'Raleway', sans-serif;
+  color: #e0d6c2;
+}
+
+/* ── Header ── */
+.gallery-header {
+  text-align: center;
+  padding: 48px 20px 32px;
+}
+
+.gallery-header h1 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  background: linear-gradient(180deg, #F5E6B8 0%, #D4AF37 50%, #8B6914 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+
+.gallery-header p {
+  font-size: 13px;
+  font-weight: 300;
+  color: #8a7f6a;
+  letter-spacing: 1px;
+}
+
+.gallery-nav {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.gallery-nav a {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #D4AF37;
+  text-decoration: none;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  padding: 6px 18px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.gallery-nav a:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.5);
+}
+
+/* ── Grid ── */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 24px;
+  padding: 0 40px 60px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.gallery-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(212, 175, 55, 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.gallery-card:hover {
+  border-color: rgba(212, 175, 55, 0.4);
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.1);
+  transform: translateY(-2px);
+}
+
+.gallery-card img {
+  width: 100%;
+  aspect-ratio: 450 / 680;
+  object-fit: cover;
+  display: block;
+}
+
+.gallery-card-info {
+  padding: 12px 14px;
+}
+
+.gallery-card-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #D4AF37;
+  margin-bottom: 2px;
+}
+
+.gallery-card-title {
+  font-size: 11px;
+  font-weight: 400;
+  color: #8a7f6a;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* ── Empty State ── */
+.gallery-empty {
+  text-align: center;
+  padding: 80px 20px;
+  color: #5a5548;
+  font-size: 15px;
+  letter-spacing: 1px;
+}
+
+/* ── Modal ── */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.modal-overlay.active {
+  display: flex;
+}
+
+.modal-content {
+  position: relative;
+  max-width: 500px;
+  width: 100%;
+}
+
+.modal-content img {
+  width: 100%;
+  border-radius: 12px;
+  border: 2px solid rgba(212, 175, 55, 0.3);
+  box-shadow: 0 0 40px rgba(212, 175, 55, 0.1);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.modal-btn {
+  font-family: 'Raleway', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 10px 28px;
+  border: 2px solid #D4AF37;
+  border-radius: 6px;
+  background: transparent;
+  color: #D4AF37;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.modal-btn:hover {
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.15);
+}
+
+.modal-btn--primary {
+  background: linear-gradient(135deg, #8B6914, #D4AF37);
+  color: #0a0a0f;
+  border-color: transparent;
+}
+
+.modal-btn--primary:hover {
+  background: linear-gradient(135deg, #D4AF37, #F5E6B8);
+}
+
+.modal-close {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 32px;
+  height: 32px;
+  background: #0a0a0f;
+  border: 1px solid rgba(212, 175, 55, 0.4);
+  border-radius: 50%;
+  color: #D4AF37;
+  font-size: 18px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  z-index: 101;
+}
+
+.modal-close:hover {
+  background: rgba(212, 175, 55, 0.15);
+}

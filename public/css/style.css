@@ -47,6 +47,26 @@ body {
   letter-spacing: 1px;
 }
 
+.gallery-link {
+  display: inline-block;
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #D4AF37;
+  text-decoration: none;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+  padding: 6px 18px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.gallery-link:hover {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.5);
+}
+
 /* ── Form Fields ── */
 .field {
   margin-bottom: 20px;

@@ -1,5 +1,10 @@
 const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const { pool } = require('../db');
 const router = express.Router();
+
+const storagePath = process.env.CARD_STORAGE_PATH || path.join(__dirname, '..', 'card-images');
 
 function getOpenAI() {
   if (!process.env.OPENAI_API_KEY) return null;
@@ -18,12 +23,12 @@ router.post('/generate-stats', async (req, res) => {
   const openai = getOpenAI();
 
   if (!openai) {
-    const pool = [
+    const labels = [
       'Leadership', 'Creativity', 'Execution', 'Strategy', 'Impact',
       'Innovation', 'Teamwork', 'Vision', 'Drive', 'Expertise',
       'Communication', 'Problem Solving', 'Adaptability', 'Focus'
     ];
-    const shuffled = pool.sort(() => Math.random() - 0.5);
+    const shuffled = labels.sort(() => Math.random() - 0.5);
     const stats = shuffled.slice(0, 3).map(label => ({
       label,
       value: Math.floor(Math.random() * 10) + 90
@@ -75,6 +80,77 @@ router.post('/generate-image', async (req, res) => {
   } catch (err) {
     console.error('Image generation error:', err.message);
     res.status(500).json({ error: 'Failed to generate image' });
+  }
+});
+
+// ── Card Persistence Routes ──
+
+// Save card PNG + metadata
+router.post('/cards', async (req, res) => {
+  try {
+    const { name, title, skills, stats, photo_url, image } = req.body;
+
+    if (!name || !title || !image) {
+      return res.status(400).json({ error: 'name, title, and image are required' });
+    }
+
+    const result = await pool.query(
+      `INSERT INTO cards (name, title, skills, stats, photo_url)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id`,
+      [name, title, JSON.stringify(skills || []), JSON.stringify(stats || []), photo_url || null]
+    );
+
+    const id = result.rows[0].id;
+
+    // Decode base64 PNG and write to disk
+    const base64Data = image.replace(/^data:image\/png;base64,/, '');
+    const filePath = path.join(storagePath, `${id}.png`);
+    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+
+    res.json({ id });
+  } catch (err) {
+    console.error('Save card error:', err.message);
+    res.status(500).json({ error: 'Failed to save card' });
+  }
+});
+
+// List all cards for gallery
+router.get('/cards', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT id, name, title, created_at FROM cards ORDER BY created_at DESC'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('List cards error:', err.message);
+    res.status(500).json({ error: 'Failed to list cards' });
+  }
+});
+
+// Serve card PNG from disk
+router.get('/cards/:id/image', (req, res) => {
+  const filePath = path.join(storagePath, `${req.params.id}.png`);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Image not found' });
+  }
+  res.sendFile(filePath);
+});
+
+// Get single card metadata
+router.get('/cards/:id', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT * FROM cards WHERE id = $1',
+      [req.params.id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Get card error:', err.message);
+    res.status(500).json({ error: 'Failed to get card' });
   }
 });
 

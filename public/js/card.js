@@ -49,6 +49,9 @@ document.addEventListener('DOMContentLoaded', () => {
       link.download = `${(data.name || 'card').replace(/\s+/g, '_')}_render_card.png`;
       link.href = dataUrl;
       link.click();
+
+      // Fire-and-forget save to gallery
+      saveCard(dataUrl);
     } catch (err) {
       console.error('PNG generation failed:', err);
       alert('Failed to generate PNG. Try again.');
@@ -57,4 +60,28 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.disabled = false;
     }
   });
+
+  async function saveCard(imageDataUrl) {
+    const status = document.getElementById('save-status');
+    try {
+      const resp = await fetch('/api/cards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: data.name,
+          title: data.title,
+          skills: data.skills || [],
+          stats: data.stats || [],
+          photo_url: data.photo || null,
+          image: imageDataUrl
+        })
+      });
+      if (resp.ok) {
+        status.textContent = 'Saved to gallery';
+        status.classList.add('visible');
+      }
+    } catch (err) {
+      console.warn('Gallery save failed (non-blocking):', err.message);
+    }
+  }
 });

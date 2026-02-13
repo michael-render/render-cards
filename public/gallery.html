@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery — Render Stat Cards</title>
+  <link rel="stylesheet" href="/css/gallery.css">
+</head>
+<body>
+  <div class="gallery-header">
+    <h1>Card Gallery</h1>
+    <p>All generated stat cards</p>
+    <div class="gallery-nav">
+      <a href="/">Create Card</a>
+    </div>
+  </div>
+
+  <div class="gallery-grid" id="gallery-grid"></div>
+  <div class="gallery-empty" id="gallery-empty" style="display:none">
+    No cards yet — go create one!
+  </div>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modal">
+    <div class="modal-content">
+      <button class="modal-close" id="modal-close">&times;</button>
+      <img id="modal-image" src="" alt="Card">
+      <div class="modal-actions">
+        <a class="modal-btn modal-btn--primary" id="modal-download" href="" download>Download</a>
+        <button class="modal-btn" id="modal-close-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/js/gallery.js"></script>
+</body>
+</html>
