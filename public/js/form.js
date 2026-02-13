@@ -29,14 +29,35 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // Resize image to fit card photo frame (max 480x600)
+  function resizeImage(dataUrl, maxW, maxH) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.width, h = img.height;
+        if (w > maxW || h > maxH) {
+          const ratio = Math.min(maxW / w, maxH / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = dataUrl;
+    });
+  }
+
   // File upload → base64
-  document.getElementById('photo-file').addEventListener('change', (e) => {
+  document.getElementById('photo-file').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (ev) => {
-      photoDataUrl = ev.target.result;
+    reader.onload = async (ev) => {
+      photoDataUrl = await resizeImage(ev.target.result, 480, 600);
       const preview = document.getElementById('photo-preview');
       preview.innerHTML = `<img src="${photoDataUrl}" alt="Preview">`;
     };
@@ -118,7 +139,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     } catch (err) {
       console.error(err);
-      status.textContent = 'Something went wrong. Please try again.';
+      const msg = err.name === 'QuotaExceededError'
+        ? 'Photo is too large. Please use a smaller image.'
+        : 'Something went wrong. Please try again.';
+      status.textContent = msg;
       status.className = 'status error';
       btn.disabled = false;
       btn.textContent = 'Generate Card';
