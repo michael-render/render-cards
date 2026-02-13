@@ -29,6 +29,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   });
 
+  // Restore form state if returning from card preview
+  const saved = sessionStorage.getItem('formData');
+  if (saved) {
+    try {
+      const f = JSON.parse(saved);
+      document.getElementById('name').value = f.name || '';
+      document.getElementById('title').value = f.title || '';
+      if (f.skills) {
+        f.skills.forEach((s, i) => {
+          const el = document.getElementById(`skill-${i}`);
+          if (el) el.value = s;
+        });
+      }
+      if (f.photoDescription) {
+        document.getElementById('photo-description').value = f.photoDescription;
+      }
+      if (f.photoDataUrl) {
+        photoDataUrl = f.photoDataUrl;
+        document.getElementById('photo-preview').innerHTML =
+          `<img src="${photoDataUrl}" alt="Preview">`;
+      }
+      if (f.activeTab && f.activeTab !== 'upload') {
+        const tab = document.querySelector(`.photo-tab[data-tab="${f.activeTab}"]`);
+        if (tab) tab.click();
+      }
+    } catch (e) {
+      // Ignore corrupt data
+    }
+    sessionStorage.removeItem('formData');
+  }
+
   // Resize image to fit card photo frame (max 480x600)
   function resizeImage(dataUrl, maxW, maxH) {
     return new Promise((resolve) => {
@@ -158,6 +189,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       };
 
       sessionStorage.setItem('cardData', JSON.stringify(cardData));
+
+      // Save form state so "Back" from preview restores entries
+      sessionStorage.setItem('formData', JSON.stringify({
+        name,
+        title,
+        skills,
+        photoDataUrl,
+        activeTab,
+        photoDescription: document.getElementById('photo-description').value
+      }));
+
       window.location.href = '/card.html';
 
     } catch (err) {
