@@ -1,0 +1,310 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Raleway:wght@300;400;500;600&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: #0a0a0f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  font-family: 'Raleway', sans-serif;
+  color: #e0d6c2;
+}
+
+.page-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 40px 20px;
+}
+
+/* ── Card Container ── */
+.card-container {
+  width: 450px;
+  height: 680px;
+  position: relative;
+  border-radius: 18px;
+  background: linear-gradient(170deg, #0a0a0f 0%, #12121a 40%, #0e0e16 100%);
+  overflow: hidden;
+  box-shadow:
+    0 0 20px rgba(212, 175, 55, 0.15),
+    0 0 60px rgba(212, 175, 55, 0.05),
+    0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Gold Metallic Border ── */
+.card-border {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  padding: 3px;
+  background: linear-gradient(
+    160deg,
+    #8B6914 0%,
+    #D4AF37 20%,
+    #F5E6B8 40%,
+    #D4AF37 55%,
+    #8B6914 70%,
+    #D4AF37 85%,
+    #F5E6B8 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* ── Corner Accents ── */
+.corner {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.corner::before,
+.corner::after {
+  content: '';
+  position: absolute;
+  background: linear-gradient(90deg, #D4AF37, #F5E6B8);
+}
+
+.corner--tl { top: 10px; left: 10px; }
+.corner--tl::before { top: 0; left: 0; width: 100%; height: 2px; }
+.corner--tl::after { top: 0; left: 0; width: 2px; height: 100%; }
+
+.corner--tr { top: 10px; right: 10px; }
+.corner--tr::before { top: 0; right: 0; width: 100%; height: 2px; }
+.corner--tr::after { top: 0; right: 0; width: 2px; height: 100%; }
+
+.corner--bl { bottom: 10px; left: 10px; }
+.corner--bl::before { bottom: 0; left: 0; width: 100%; height: 2px; }
+.corner--bl::after { bottom: 0; left: 0; width: 2px; height: 100%; }
+
+.corner--br { bottom: 10px; right: 10px; }
+.corner--br::before { bottom: 0; right: 0; width: 100%; height: 2px; }
+.corner--br::after { bottom: 0; right: 0; width: 2px; height: 100%; }
+
+/* ── Card Inner Content ── */
+.card-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding: 28px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  z-index: 1;
+}
+
+/* ── Subtle Radial Glow ── */
+.card-inner::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120%;
+  height: 80%;
+  background: radial-gradient(ellipse, rgba(212, 175, 55, 0.04) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* ── Photo Frame ── */
+.photo-frame {
+  width: 160px;
+  height: 200px;
+  border: 2px solid #D4AF37;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 10px;
+  margin-bottom: 16px;
+  box-shadow:
+    0 0 12px rgba(212, 175, 55, 0.2),
+    0 4px 16px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
+}
+
+.photo-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* ── Name ── */
+.card-name {
+  font-family: 'Oswald', sans-serif;
+  font-size: 42px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  line-height: 1.1;
+  text-align: center;
+  background: linear-gradient(180deg, #F5E6B8 0%, #D4AF37 50%, #8B6914 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+}
+
+/* ── Title Banner ── */
+.card-title {
+  font-family: 'Raleway', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: #c9b97a;
+  background: rgba(212, 175, 55, 0.08);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  border-radius: 4px;
+  padding: 5px 18px;
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+/* ── Stats Section ── */
+.stats-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-left: 3px solid #D4AF37;
+  background: rgba(212, 175, 55, 0.03);
+  border-radius: 0 4px 4px 0;
+}
+
+.stat-label {
+  font-family: 'Raleway', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #8a7f6a;
+}
+
+.stat-value {
+  font-family: 'Oswald', sans-serif;
+  font-size: 28px;
+  font-weight: 700;
+  background: linear-gradient(180deg, #F5E6B8 0%, #D4AF37 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Skills Section ── */
+.skills-section {
+  width: 100%;
+  margin-top: auto;
+}
+
+.skills-header {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: #D4AF37;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.skills-header::before {
+  content: '\2605';
+  font-size: 11px;
+}
+
+.skill-item {
+  font-family: 'Raleway', sans-serif;
+  font-size: 12px;
+  font-weight: 400;
+  color: #a89e8a;
+  padding: 3px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.skill-item::before {
+  content: '\2713';
+  color: #D4AF37;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── Render Watermark ── */
+.card-watermark {
+  position: absolute;
+  bottom: 12px;
+  right: 16px;
+  font-family: 'Raleway', sans-serif;
+  font-size: 9px;
+  font-weight: 300;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: rgba(212, 175, 55, 0.2);
+  z-index: 2;
+}
+
+/* ── Download Button (not captured) ── */
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.btn {
+  font-family: 'Raleway', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 12px 32px;
+  border: 2px solid #D4AF37;
+  border-radius: 6px;
+  background: transparent;
+  color: #D4AF37;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.15);
+}
+
+.btn--primary {
+  background: linear-gradient(135deg, #8B6914, #D4AF37);
+  color: #0a0a0f;
+  border-color: transparent;
+}
+
+.btn--primary:hover {
+  background: linear-gradient(135deg, #D4AF37, #F5E6B8);
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.3);
+}

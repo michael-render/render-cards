@@ -1,0 +1,12 @@
+services:
+  - type: web
+    runtime: node
+    name: render-stat-cards
+    plan: free
+    buildCommand: npm ci
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false

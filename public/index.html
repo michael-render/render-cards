@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Render Stat Cards</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="form-container">
+    <div class="form-header">
+      <h1>Render Stat Cards</h1>
+      <p>Generate your premium trading card</p>
+    </div>
+
+    <form id="card-form">
+      <div class="field">
+        <label for="name">Name</label>
+        <input type="text" id="name" placeholder="Your name" required>
+      </div>
+
+      <div class="field">
+        <label for="title">Title</label>
+        <input type="text" id="title" placeholder="e.g. Senior Software Engineer" required>
+      </div>
+
+      <div class="photo-section">
+        <label>Photo <span class="ai-badge ai-badge--off" id="ai-photo-badge">AI Off</span></label>
+        <div class="photo-tabs">
+          <button type="button" class="photo-tab active" data-tab="upload">Upload</button>
+          <button type="button" class="photo-tab" data-tab="ai" id="ai-tab">AI Generate</button>
+        </div>
+        <div class="photo-panel active" id="panel-upload">
+          <div class="file-upload">
+            <input type="file" id="photo-file" accept="image/*">
+            <div class="file-upload-text"><strong>Click to upload</strong> or drag a photo</div>
+          </div>
+          <div class="photo-preview" id="photo-preview"></div>
+        </div>
+        <div class="photo-panel" id="panel-ai">
+          <div class="field" style="margin-bottom:0">
+            <textarea id="photo-description" placeholder="Describe appearance: e.g. woman with curly brown hair, glasses, smiling"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Top Skills</label>
+        <div class="skills-group">
+          <input type="text" id="skill-0" placeholder="Skill 1, e.g. Cloud Infrastructure">
+          <input type="text" id="skill-1" placeholder="Skill 2, e.g. System Design">
+          <input type="text" id="skill-2" placeholder="Skill 3, e.g. Team Leadership">
+        </div>
+      </div>
+
+      <button type="submit" class="submit-btn" id="submit-btn">Generate Card</button>
+      <div class="status" id="status"></div>
+    </form>
+  </div>
+
+  <script src="/js/form.js"></script>
+</body>
+</html>

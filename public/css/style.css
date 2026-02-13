@@ -1,0 +1,257 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Raleway:wght@300;400;500;600&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: linear-gradient(170deg, #0a0a0f 0%, #12121a 50%, #0e0e16 100%);
+  min-height: 100vh;
+  font-family: 'Raleway', sans-serif;
+  color: #e0d6c2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.form-container {
+  width: 100%;
+  max-width: 480px;
+}
+
+.form-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.form-header h1 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  background: linear-gradient(180deg, #F5E6B8 0%, #D4AF37 50%, #8B6914 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+
+.form-header p {
+  font-size: 13px;
+  font-weight: 300;
+  color: #8a7f6a;
+  letter-spacing: 1px;
+}
+
+/* ── Form Fields ── */
+.field {
+  margin-bottom: 20px;
+}
+
+.field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #D4AF37;
+  margin-bottom: 8px;
+}
+
+.field input[type="text"],
+.field textarea {
+  width: 100%;
+  padding: 12px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(212, 175, 55, 0.2);
+  border-radius: 6px;
+  color: #e0d6c2;
+  font-family: 'Raleway', sans-serif;
+  font-size: 15px;
+  transition: border-color 0.2s;
+  outline: none;
+}
+
+.field input[type="text"]:focus,
+.field textarea:focus {
+  border-color: rgba(212, 175, 55, 0.5);
+  box-shadow: 0 0 12px rgba(212, 175, 55, 0.08);
+}
+
+.field input::placeholder,
+.field textarea::placeholder {
+  color: #4a4538;
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+
+/* ── Photo Section ── */
+.photo-section {
+  margin-bottom: 20px;
+}
+
+.photo-section label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #D4AF37;
+  margin-bottom: 8px;
+}
+
+.photo-tabs {
+  display: flex;
+  gap: 0;
+  margin-bottom: 12px;
+}
+
+.photo-tab {
+  flex: 1;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  color: #8a7f6a;
+  font-family: 'Raleway', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.photo-tab:first-child { border-radius: 6px 0 0 6px; }
+.photo-tab:last-child { border-radius: 0 6px 6px 0; }
+
+.photo-tab.active {
+  background: rgba(212, 175, 55, 0.1);
+  border-color: rgba(212, 175, 55, 0.4);
+  color: #D4AF37;
+}
+
+.photo-panel { display: none; }
+.photo-panel.active { display: block; }
+
+.file-upload {
+  position: relative;
+  width: 100%;
+  padding: 24px;
+  border: 2px dashed rgba(212, 175, 55, 0.2);
+  border-radius: 6px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.file-upload:hover {
+  border-color: rgba(212, 175, 55, 0.4);
+}
+
+.file-upload input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.file-upload-text {
+  font-size: 13px;
+  color: #8a7f6a;
+}
+
+.file-upload-text strong {
+  color: #D4AF37;
+}
+
+.photo-preview {
+  margin-top: 10px;
+  text-align: center;
+}
+
+.photo-preview img {
+  max-width: 120px;
+  max-height: 150px;
+  border-radius: 6px;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+/* ── Skills ── */
+.skills-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── AI Badge ── */
+.ai-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.ai-badge--on {
+  background: rgba(212, 175, 55, 0.15);
+  color: #D4AF37;
+  border: 1px solid rgba(212, 175, 55, 0.3);
+}
+
+.ai-badge--off {
+  background: rgba(255, 255, 255, 0.05);
+  color: #5a5548;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ── Submit ── */
+.submit-btn {
+  width: 100%;
+  padding: 14px;
+  margin-top: 12px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background: linear-gradient(135deg, #8B6914, #D4AF37);
+  color: #0a0a0f;
+  transition: all 0.2s;
+}
+
+.submit-btn:hover {
+  background: linear-gradient(135deg, #D4AF37, #F5E6B8);
+  box-shadow: 0 0 24px rgba(212, 175, 55, 0.25);
+}
+
+.submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Status Message ── */
+.status {
+  text-align: center;
+  margin-top: 12px;
+  font-size: 13px;
+  color: #8a7f6a;
+  min-height: 20px;
+}
+
+.status.error {
+  color: #c0392b;
+}

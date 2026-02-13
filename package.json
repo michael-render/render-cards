@@ -1,0 +1,13 @@
+{
+  "name": "render-stat-cards",
+  "version": "1.0.0",
+  "description": "Premium trading-style stat cards for Render employees",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "openai": "^4.52.0"
+  }
+}
