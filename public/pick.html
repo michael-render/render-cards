@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Choose Your Portrait</title>
+  <link rel="stylesheet" href="/css/pick.css">
+</head>
+<body>
+  <div class="pick-container">
+    <div class="pick-header">
+      <h1>Choose Your Style</h1>
+      <p>Select your favorite AI-generated portrait</p>
+    </div>
+
+    <div class="portraits" id="portraits">
+      <div class="portrait-card" data-index="0">
+        <div class="portrait-frame">
+          <div class="portrait-loading" id="loading-0">Generating...</div>
+          <img class="portrait-img" id="img-0" alt="Dramatic style">
+        </div>
+        <div class="portrait-label">Dramatic</div>
+      </div>
+      <div class="portrait-card" data-index="1">
+        <div class="portrait-frame">
+          <div class="portrait-loading" id="loading-1">Generating...</div>
+          <img class="portrait-img" id="img-1" alt="Watercolor style">
+        </div>
+        <div class="portrait-label">Watercolor</div>
+      </div>
+      <div class="portrait-card" data-index="2">
+        <div class="portrait-frame">
+          <div class="portrait-loading" id="loading-2">Generating...</div>
+          <img class="portrait-img" id="img-2" alt="Pop Art style">
+        </div>
+        <div class="portrait-label">Pop Art</div>
+      </div>
+    </div>
+
+    <div class="pick-actions">
+      <button class="btn" id="back-btn">Back</button>
+    </div>
+    <div class="pick-status" id="status"></div>
+  </div>
+
+  <script src="/js/pick.js"></script>
+</body>
+</html>
