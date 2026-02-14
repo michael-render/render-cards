@@ -50,8 +50,8 @@ document.addEventListener('DOMContentLoaded', () => {
       link.href = dataUrl;
       link.click();
 
-      // Fire-and-forget save to gallery
-      saveCard(dataUrl);
+      // Save to gallery before user navigates away
+      await saveCard(dataUrl);
     } catch (err) {
       console.error('PNG generation failed:', err);
       alert('Failed to generate PNG. Try again.');
