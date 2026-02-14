@@ -58,6 +58,57 @@ router.post('/generate-stats', async (req, res) => {
   }
 });
 
+// Enhance uploaded photo: vision description → DALL-E stylized portrait
+router.post('/enhance-photo', async (req, res) => {
+  const { photo, name, title } = req.body;
+  const openai = getOpenAI();
+
+  if (!openai || !photo) {
+    return res.json({ image: null });
+  }
+
+  try {
+    // Step 1: Use GPT-4o-mini vision to describe the person in the photo
+    const visionRes = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{
+        role: 'system',
+        content: 'Describe this person\'s physical appearance concisely: hair color/style, skin tone, facial features, expression, glasses, facial hair, and any distinguishing characteristics. Keep it to 2-3 sentences.'
+      }, {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: photo } }
+        ]
+      }]
+    });
+
+    const description = visionRes.choices[0].message.content;
+
+    // Step 2: Generate a stylized trading card portrait with DALL-E 3
+    const dallePrompt = `A stylized premium trading card portrait of ${name}, ${title}. Based on this appearance: ${description}. Painted in a dramatic, collectible card style with rich gold and dark tones, cinematic lighting, and a polished background. Upper body portrait, facing the viewer.`;
+
+    const imageRes = await openai.images.generate({
+      model: 'dall-e-3',
+      prompt: dallePrompt,
+      n: 1,
+      size: '1024x1024',
+      quality: 'standard'
+    });
+
+    // Fetch the image and convert to base64 data URL to avoid client-side CORS issues
+    const imageUrl = imageRes.data[0].url;
+    const imgResp = await fetch(imageUrl);
+    const arrBuf = await imgResp.arrayBuffer();
+    const base64 = Buffer.from(arrBuf).toString('base64');
+    const dataUrl = `data:image/png;base64,${base64}`;
+
+    res.json({ image: dataUrl });
+  } catch (err) {
+    console.error('Photo enhancement error:', err.message);
+    res.json({ image: null });
+  }
+});
+
 // Generate AI headshot via DALL-E
 router.post('/generate-image', async (req, res) => {
   const { description } = req.body;
@@ -76,7 +127,14 @@ router.post('/generate-image', async (req, res) => {
       quality: 'standard'
     });
 
-    res.json({ image: response.data[0].url });
+    // Fetch the image and convert to base64 data URL to avoid client-side CORS issues
+    const imageUrl = response.data[0].url;
+    const imgResp = await fetch(imageUrl);
+    const arrBuf = await imgResp.arrayBuffer();
+    const base64 = Buffer.from(arrBuf).toString('base64');
+    const dataUrl = `data:image/png;base64,${base64}`;
+
+    res.json({ image: dataUrl });
   } catch (err) {
     console.error('Image generation error:', err.message);
     res.status(500).json({ error: 'Failed to generate image' });
