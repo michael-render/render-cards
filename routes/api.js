@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
@@ -11,6 +12,23 @@ function getOpenAI() {
   const OpenAI = require('openai');
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
+
+function getRender() {
+  if (!process.env.RENDER_API_KEY) return null;
+  const { Render } = require('@renderinc/sdk');
+  return new Render({ token: process.env.RENDER_API_KEY });
+}
+
+// ── Portrait Session Store (in-memory, 15-min TTL) ──
+const portraitSessions = new Map();
+const SESSION_TTL = 15 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, session] of portraitSessions) {
+    if (now - session.createdAt > SESSION_TTL) portraitSessions.delete(id);
+  }
+}, 60 * 1000);
 
 // Feature detection
 router.get('/health', (req, res) => {
@@ -139,6 +157,77 @@ router.post('/generate-image', async (req, res) => {
     console.error('Image generation error:', err.message);
     res.status(500).json({ error: 'Failed to generate image' });
   }
+});
+
+// ── Multi-Portrait via Render Workflows ──
+
+router.post('/enhance-photo-multi', async (req, res) => {
+  const { photo, name, title } = req.body;
+  const openai = getOpenAI();
+  const render = getRender();
+
+  if (!openai || !render || !photo) {
+    return res.status(400).json({ error: 'AI or Workflows not available' });
+  }
+
+  try {
+    // Step 1: Vision call to describe the person
+    const visionRes = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{
+        role: 'system',
+        content: 'Describe this person\'s physical appearance concisely: hair color/style, skin tone, facial features, expression, glasses, facial hair, and any distinguishing characteristics. Keep it to 2-3 sentences.'
+      }, {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: photo } }
+        ]
+      }]
+    });
+
+    const description = visionRes.choices[0].message.content;
+
+    // Step 2: Run workflow parent task (fans out to 3 DALL-E calls in parallel)
+    const taskRun = await render.workflows.runTask(
+      'render-cards-workflow/generate-portraits',
+      [description, name, title]
+    );
+
+    const images = taskRun.results;
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(500).json({ error: 'Workflow returned no images' });
+    }
+
+    // Step 3: Store in session
+    const sessionId = crypto.randomUUID();
+    portraitSessions.set(sessionId, { images, createdAt: Date.now() });
+
+    res.json({ sessionId });
+  } catch (err) {
+    console.error('Multi-portrait error:', err.message);
+    res.status(500).json({ error: 'Failed to generate portraits' });
+  }
+});
+
+router.get('/portraits/:sessionId', (req, res) => {
+  const session = portraitSessions.get(req.params.sessionId);
+  if (!session) {
+    return res.status(404).json({ error: 'Session expired or not found' });
+  }
+  res.json({ images: session.images });
+});
+
+router.get('/portraits/:sessionId/:index', (req, res) => {
+  const session = portraitSessions.get(req.params.sessionId);
+  if (!session) {
+    return res.status(404).json({ error: 'Session expired or not found' });
+  }
+  const idx = parseInt(req.params.index, 10);
+  if (isNaN(idx) || idx < 0 || idx >= session.images.length) {
+    return res.status(400).json({ error: 'Invalid index' });
+  }
+  res.json({ image: session.images[idx] });
 });
 
 // ── Card Persistence Routes ──

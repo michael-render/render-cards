@@ -19,9 +19,21 @@ services:
         value: production
       - key: OPENAI_API_KEY
         sync: false
+      - key: RENDER_API_KEY
+        sync: false
       - key: DATABASE_URL
         fromDatabase:
           name: render-cards-db
           property: connectionString
       - key: CARD_STORAGE_PATH
         value: /var/data/cards
+
+  - type: workflow
+    runtime: node
+    name: render-cards-workflow
+    plan: starter
+    buildCommand: npm ci
+    startCommand: node workflows/tasks.js
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
