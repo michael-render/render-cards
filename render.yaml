@@ -10,6 +10,7 @@ services:
     plan: starter
     buildCommand: npm ci
     startCommand: node server.js
+    healthCheckPath: /api/health
     disk:
       name: card-images
       mountPath: /var/data/cards

@@ -30,9 +30,14 @@ setInterval(() => {
   }
 }, 60 * 1000);
 
-// Feature detection
-router.get('/health', (req, res) => {
-  res.json({ aiEnabled: !!process.env.OPENAI_API_KEY });
+// Health check — verifies DB is reachable before Render routes traffic
+router.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ aiEnabled: !!process.env.OPENAI_API_KEY });
+  } catch (err) {
+    res.status(503).json({ error: 'Database not ready' });
+  }
 });
 
 // Generate stats via GPT or fallback to random
