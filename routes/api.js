@@ -146,7 +146,7 @@ router.post('/generate-image', async (req, res) => {
   }
 });
 
-// ── Multi-Portrait via Render Workflows ──
+// ── Multi-Portrait (parallel gpt-image-1 calls) ──
 
 const PORTRAIT_STYLES = [
   'Dramatic collectible card style with rich gold and dark tones, cinematic rim lighting, intense atmosphere',
@@ -154,12 +154,24 @@ const PORTRAIT_STYLES = [
   'Bold collectible card style with deep shadows, golden accents, sharp dramatic lighting',
 ];
 
+async function generatePortrait(openai, imageFile, name, title, style) {
+  const prompt = `A stylized premium trading card portrait of ${name}, ${title}. ${style}. Upper body portrait, facing the viewer.`;
+  const result = await openai.images.edit({
+    model: 'gpt-image-1',
+    image: imageFile,
+    prompt,
+    size: '1024x1024',
+    quality: 'low',
+  });
+  return `data:image/png;base64,${result.data[0].b64_json}`;
+}
+
 router.post('/enhance-photo-multi', async (req, res) => {
   const { photo, name, title } = req.body;
-  const render = getRender();
+  const openai = getOpenAI();
 
-  if (!process.env.OPENAI_API_KEY || !render || !photo) {
-    return res.status(400).json({ error: 'AI or Workflows not available' });
+  if (!openai || !photo) {
+    return res.status(400).json({ error: 'AI not available' });
   }
 
   try {
@@ -170,40 +182,24 @@ router.post('/enhance-photo-multi', async (req, res) => {
       createdAt: Date.now(),
     });
 
-    // Start 3 individual subtasks in parallel, each with photo + different style
-    const headers = {
-      'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
-      'Content-Type': 'application/json',
-    };
+    // Convert photo once, reuse for all 3 calls
+    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
 
-    const startPromises = PORTRAIT_STYLES.map((style) =>
-      fetch('https://api.render.com/v1/task-runs', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          task: 'render-cards-workflow/generate-single-portrait',
-          input: [photo, name, title, style],
-        }),
-      }).then(r => r.json())
-    );
-
-    const taskRuns = await Promise.all(startPromises);
-    const taskRunIds = taskRuns.map(r => r.id);
-    console.log(`[workflow] Started 3 tasks: ${taskRunIds.join(', ')}`);
-
-    // Wait for all 3 via SSE in background
+    // Run 3 parallel gpt-image-1 calls in the background
     Promise.all(
-      taskRunIds.map(id => render.workflows.waitForTask(id))
-    ).then((results) => {
-      console.log(`[workflow] All 3 completed for session ${sessionId}`);
+      PORTRAIT_STYLES.map(async (style) => {
+        const imageFile = await openai.toFile(imageBuffer, 'photo.png', { type: 'image/png' });
+        return generatePortrait(openai, imageFile, name, title, style);
+      })
+    ).then((images) => {
+      console.log(`[portraits] All 3 completed for session ${sessionId}`);
       const session = portraitSessions.get(sessionId);
       if (!session) return;
-      const images = results.map(r => r.results?.[0] || r.results);
-      console.log(`[workflow] Storing ${images.length} images`);
       session.status = 'ready';
       session.images = images;
     }).catch((err) => {
-      console.error(`[workflow] Error: ${err.message}`);
+      console.error(`[portraits] Error: ${err.message}`);
       const session = portraitSessions.get(sessionId);
       if (session) {
         session.status = 'failed';
