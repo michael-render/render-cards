@@ -1,0 +1,184 @@
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Raleway:wght@300;400;500;600&display=swap');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: linear-gradient(170deg, #0a0a0f 0%, #12121a 50%, #0e0e16 100%);
+  min-height: 100vh;
+  font-family: 'Raleway', sans-serif;
+  color: #e0d6c2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.pick-container {
+  width: 100%;
+  max-width: 960px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pick-header {
+  text-align: center;
+  margin-bottom: 36px;
+}
+
+.pick-header h1 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  background: linear-gradient(180deg, #F5E6B8 0%, #D4AF37 50%, #8B6914 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+}
+
+.pick-header p {
+  font-size: 13px;
+  font-weight: 300;
+  color: #8a7f6a;
+  letter-spacing: 1px;
+}
+
+/* ── Portrait Grid ── */
+.portraits {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 32px;
+}
+
+.portrait-card {
+  width: 260px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.portrait-card:hover {
+  transform: translateY(-4px);
+}
+
+.portrait-card:hover .portrait-frame {
+  border-color: rgba(212, 175, 55, 0.6);
+  box-shadow:
+    0 0 20px rgba(212, 175, 55, 0.2),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.portrait-card.selected .portrait-frame {
+  border-color: #D4AF37;
+  box-shadow:
+    0 0 24px rgba(212, 175, 55, 0.35),
+    0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.portrait-frame {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 2px solid rgba(212, 175, 55, 0.25);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.02);
+  position: relative;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: none;
+}
+
+.portrait-img.loaded {
+  display: block;
+}
+
+.portrait-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 400;
+  color: #8a7f6a;
+  letter-spacing: 1px;
+}
+
+.portrait-loading.hidden {
+  display: none;
+}
+
+.portrait-label {
+  text-align: center;
+  margin-top: 12px;
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: #D4AF37;
+}
+
+/* ── Actions ── */
+.pick-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  font-family: 'Raleway', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  padding: 12px 32px;
+  border: 2px solid #D4AF37;
+  border-radius: 6px;
+  background: transparent;
+  color: #D4AF37;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  background: rgba(212, 175, 55, 0.1);
+  box-shadow: 0 0 16px rgba(212, 175, 55, 0.15);
+}
+
+/* ── Status ── */
+.pick-status {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #8a7f6a;
+  min-height: 20px;
+}
+
+.pick-status.error {
+  color: #c0392b;
+}
+
+/* ── Responsive ── */
+@media (max-width: 860px) {
+  .portraits {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .portrait-card {
+    width: 280px;
+  }
+}

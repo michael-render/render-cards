@@ -19,9 +19,13 @@ services:
         value: production
       - key: OPENAI_API_KEY
         sync: false
+      - key: RENDER_API_KEY
+        sync: false
       - key: DATABASE_URL
         fromDatabase:
           name: render-cards-db
           property: connectionString
       - key: CARD_STORAGE_PATH
         value: /var/data/cards
+      # Workflow service (render-cards-workflow) must be created manually
+      # in the Dashboard — Blueprints don't support type: workflow

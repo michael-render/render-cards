@@ -1,4 +1,5 @@
 const express = require('express');
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
@@ -11,6 +12,23 @@ function getOpenAI() {
   const OpenAI = require('openai');
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
+
+function getRender() {
+  if (!process.env.RENDER_API_KEY) return null;
+  const { Render } = require('@renderinc/sdk');
+  return new Render({ token: process.env.RENDER_API_KEY });
+}
+
+// ── Portrait Session Store (in-memory, 15-min TTL) ──
+const portraitSessions = new Map();
+const SESSION_TTL = 15 * 60 * 1000;
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [id, session] of portraitSessions) {
+    if (now - session.createdAt > SESSION_TTL) portraitSessions.delete(id);
+  }
+}, 60 * 1000);
 
 // Feature detection
 router.get('/health', (req, res) => {
@@ -139,6 +157,127 @@ router.post('/generate-image', async (req, res) => {
     console.error('Image generation error:', err.message);
     res.status(500).json({ error: 'Failed to generate image' });
   }
+});
+
+// ── Multi-Portrait via Render Workflows ──
+
+const PORTRAIT_STYLE = 'Dramatic collectible card style with rich gold and dark tones, cinematic lighting';
+
+router.post('/enhance-photo-multi', async (req, res) => {
+  const { photo, name, title } = req.body;
+  const openai = getOpenAI();
+  const render = getRender();
+
+  if (!openai || !render || !photo) {
+    return res.status(400).json({ error: 'AI or Workflows not available' });
+  }
+
+  try {
+    // Step 1: Vision call to get 3 different descriptions of the person
+    const visionRes = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [{
+        role: 'system',
+        content: 'You describe people\'s physical appearance for portrait generation. Given a photo, produce exactly 3 different descriptions of the same person. Each should be 2-3 sentences covering hair, skin tone, facial features, expression, glasses, facial hair, and distinguishing characteristics. Vary the emphasis and wording between descriptions so each produces a distinct portrait. Return as JSON: {"descriptions": ["...", "...", "..."]}'
+      }, {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: photo } }
+        ]
+      }],
+      response_format: { type: 'json_object' }
+    });
+
+    const parsed = JSON.parse(visionRes.choices[0].message.content);
+    const descriptions = parsed.descriptions;
+
+    if (!Array.isArray(descriptions) || descriptions.length < 3) {
+      throw new Error('Vision call did not return 3 descriptions');
+    }
+
+    // Step 2: Create session in pending state
+    const sessionId = crypto.randomUUID();
+    portraitSessions.set(sessionId, {
+      status: 'pending',
+      createdAt: Date.now(),
+    });
+
+    // Step 3: Start 3 individual subtasks in parallel, each with a different description
+    const headers = {
+      'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
+      'Content-Type': 'application/json',
+    };
+
+    const startPromises = descriptions.slice(0, 3).map((desc) =>
+      fetch('https://api.render.com/v1/task-runs', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          task: 'render-cards-workflow/generate-single-portrait',
+          input: [desc, name, title, PORTRAIT_STYLE],
+        }),
+      }).then(r => r.json())
+    );
+
+    const taskRuns = await Promise.all(startPromises);
+    const taskRunIds = taskRuns.map(r => r.id);
+    console.log(`[workflow] Started 3 tasks: ${taskRunIds.join(', ')}`);
+
+    // Step 4: Wait for all 3 via SSE in background
+    Promise.all(
+      taskRunIds.map(id => render.workflows.waitForTask(id))
+    ).then((results) => {
+      console.log(`[workflow] All 3 completed for session ${sessionId}`);
+      const session = portraitSessions.get(sessionId);
+      if (!session) return;
+      // Each result has .results array with one element (the return value)
+      const images = results.map(r => r.results?.[0] || r.results);
+      console.log(`[workflow] Storing ${images.length} images`);
+      session.status = 'ready';
+      session.images = images;
+    }).catch((err) => {
+      console.error(`[workflow] Error: ${err.message}`);
+      const session = portraitSessions.get(sessionId);
+      if (session) {
+        session.status = 'failed';
+        session.error = err.message;
+      }
+    });
+
+    res.json({ sessionId });
+  } catch (err) {
+    console.error('Multi-portrait error:', err.message);
+    res.status(500).json({ error: 'Failed to generate portraits' });
+  }
+});
+
+router.get('/portraits/:sessionId', (req, res) => {
+  const session = portraitSessions.get(req.params.sessionId);
+  if (!session) {
+    return res.status(404).json({ error: 'Session expired or not found' });
+  }
+  if (session.status === 'pending') {
+    return res.json({ status: 'pending' });
+  }
+  if (session.status === 'failed') {
+    return res.status(500).json({ status: 'failed', error: session.error });
+  }
+  res.json({ status: 'ready', images: session.images });
+});
+
+router.get('/portraits/:sessionId/:index', (req, res) => {
+  const session = portraitSessions.get(req.params.sessionId);
+  if (!session) {
+    return res.status(404).json({ error: 'Session expired or not found' });
+  }
+  if (session.status !== 'ready') {
+    return res.status(400).json({ error: 'Portraits not ready yet' });
+  }
+  const idx = parseInt(req.params.index, 10);
+  if (isNaN(idx) || idx < 0 || idx >= session.images.length) {
+    return res.status(400).json({ error: 'Invalid index' });
+  }
+  res.json({ image: session.images[idx] });
 });
 
 // ── Card Persistence Routes ──

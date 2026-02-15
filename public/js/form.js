@@ -154,6 +154,41 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Enhance uploaded photo with AI vision + DALL-E
       if (aiEnabled && photoDataUrl && photo === photoDataUrl) {
+        // Try multi-portrait workflow first
+        try {
+          status.textContent = 'Generating 3 AI portrait styles...';
+          const multiRes = await fetch('/api/enhance-photo-multi', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ photo: photoDataUrl, name, title })
+          });
+          if (multiRes.ok) {
+            const multiData = await multiRes.json();
+            if (multiData.sessionId) {
+              // Store pick session and form state, then navigate
+              sessionStorage.setItem('pickSession', JSON.stringify({
+                sessionId: multiData.sessionId,
+                name,
+                title,
+                skills
+              }));
+              sessionStorage.setItem('formData', JSON.stringify({
+                name,
+                title,
+                skills,
+                photoDataUrl,
+                activeTab,
+                photoDescription: document.getElementById('photo-description').value
+              }));
+              window.location.href = '/pick.html';
+              return;
+            }
+          }
+        } catch (e) {
+          // Multi-portrait failed — fall back to single
+        }
+
+        // Fallback: single portrait enhancement
         try {
           status.textContent = 'Enhancing photo with AI...';
           const enhanceRes = await fetch('/api/enhance-photo', {
