@@ -27,13 +27,5 @@ services:
           property: connectionString
       - key: CARD_STORAGE_PATH
         value: /var/data/cards
-
-  - type: workflow
-    runtime: node
-    name: render-cards-workflow
-    plan: starter
-    buildCommand: npm ci
-    startCommand: node workflows/tasks.js
-    envVars:
-      - key: OPENAI_API_KEY
-        sync: false
+      # Workflow service (render-cards-workflow) must be created manually
+      # in the Dashboard — Blueprints don't support type: workflow
