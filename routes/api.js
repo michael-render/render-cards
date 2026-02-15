@@ -161,11 +161,7 @@ router.post('/generate-image', async (req, res) => {
 
 // ── Multi-Portrait via Render Workflows ──
 
-const STYLE_PROMPTS = [
-  'Dramatic collectible card style with rich gold and dark tones, cinematic lighting',
-  'Watercolor artistic style with soft flowing colors and painterly brushstrokes',
-  'Bold comic book pop art style with strong outlines, vibrant flat colors, and dynamic energy',
-];
+const PORTRAIT_STYLE = 'Dramatic collectible card style with rich gold and dark tones, cinematic lighting';
 
 router.post('/enhance-photo-multi', async (req, res) => {
   const { photo, name, title } = req.body;
@@ -177,21 +173,27 @@ router.post('/enhance-photo-multi', async (req, res) => {
   }
 
   try {
-    // Step 1: Vision call to describe the person (fast, ~2-3s)
+    // Step 1: Vision call to get 3 different descriptions of the person
     const visionRes = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{
         role: 'system',
-        content: 'Describe this person\'s physical appearance concisely: hair color/style, skin tone, facial features, expression, glasses, facial hair, and any distinguishing characteristics. Keep it to 2-3 sentences.'
+        content: 'You describe people\'s physical appearance for portrait generation. Given a photo, produce exactly 3 different descriptions of the same person. Each should be 2-3 sentences covering hair, skin tone, facial features, expression, glasses, facial hair, and distinguishing characteristics. Vary the emphasis and wording between descriptions so each produces a distinct portrait. Return as JSON: {"descriptions": ["...", "...", "..."]}'
       }, {
         role: 'user',
         content: [
           { type: 'image_url', image_url: { url: photo } }
         ]
-      }]
+      }],
+      response_format: { type: 'json_object' }
     });
 
-    const description = visionRes.choices[0].message.content;
+    const parsed = JSON.parse(visionRes.choices[0].message.content);
+    const descriptions = parsed.descriptions;
+
+    if (!Array.isArray(descriptions) || descriptions.length < 3) {
+      throw new Error('Vision call did not return 3 descriptions');
+    }
 
     // Step 2: Create session in pending state
     const sessionId = crypto.randomUUID();
@@ -200,19 +202,19 @@ router.post('/enhance-photo-multi', async (req, res) => {
       createdAt: Date.now(),
     });
 
-    // Step 3: Start 3 individual subtasks in parallel (avoids parent task SSE issues)
+    // Step 3: Start 3 individual subtasks in parallel, each with a different description
     const headers = {
       'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
       'Content-Type': 'application/json',
     };
 
-    const startPromises = STYLE_PROMPTS.map((style) =>
+    const startPromises = descriptions.slice(0, 3).map((desc) =>
       fetch('https://api.render.com/v1/task-runs', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           task: 'render-cards-workflow/generate-single-portrait',
-          input: [description, name, title, style],
+          input: [desc, name, title, PORTRAIT_STYLE],
         }),
       }).then(r => r.json())
     );
