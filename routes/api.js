@@ -146,7 +146,7 @@ router.post('/generate-image', async (req, res) => {
   }
 });
 
-// ── Multi-Portrait (parallel gpt-image-1 calls) ──
+// ── Multi-Portrait via Render Workflows + Object Storage ──
 
 const PORTRAIT_STYLES = [
   'Dramatic collectible card style with rich gold and dark tones, cinematic rim lighting, intense atmosphere',
@@ -154,27 +154,32 @@ const PORTRAIT_STYLES = [
   'Bold collectible card style with deep shadows, golden accents, sharp dramatic lighting',
 ];
 
-async function generatePortrait(openai, imageFile, name, title, style) {
-  const prompt = `A stylized premium trading card portrait of ${name}, ${title}. ${style}. Upper body portrait, facing the viewer.`;
-  const result = await openai.images.edit({
-    model: 'gpt-image-1',
-    image: imageFile,
-    prompt,
-    size: '1024x1024',
-    quality: 'low',
-  });
-  return `data:image/png;base64,${result.data[0].b64_json}`;
-}
+const OWNER_ID = process.env.RENDER_OWNER_ID || '';
+const REGION = 'oregon';
 
 router.post('/enhance-photo-multi', async (req, res) => {
   const { photo, name, title } = req.body;
-  const openai = getOpenAI();
+  const render = getRender();
 
-  if (!openai || !photo) {
-    return res.status(400).json({ error: 'AI not available' });
+  if (!process.env.OPENAI_API_KEY || !render || !photo) {
+    return res.status(400).json({ error: 'AI or Workflows not available' });
   }
 
   try {
+    // Upload photo to object storage so workflow tasks can access it
+    const objectKey = `portraits/${crypto.randomUUID()}.png`;
+    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Buffer.from(base64Data, 'base64');
+
+    await render.experimental.storage.objects.put({
+      ownerId: OWNER_ID,
+      region: REGION,
+      key: objectKey,
+      data: imageBuffer,
+      contentType: 'image/png',
+    });
+    console.log(`[portraits] Uploaded photo to object storage: ${objectKey} (${imageBuffer.length} bytes)`);
+
     // Create session in pending state
     const sessionId = crypto.randomUUID();
     portraitSessions.set(sessionId, {
@@ -182,22 +187,42 @@ router.post('/enhance-photo-multi', async (req, res) => {
       createdAt: Date.now(),
     });
 
-    // Convert photo once, reuse for all 3 calls
-    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer = Buffer.from(base64Data, 'base64');
+    // Start 3 workflow tasks, passing the object key (not the photo data)
+    const headers = {
+      'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
+      'Content-Type': 'application/json',
+    };
 
-    // Run 3 parallel gpt-image-1 calls in the background
+    const startPromises = PORTRAIT_STYLES.map((style) =>
+      fetch('https://api.render.com/v1/task-runs', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          task: 'render-cards-workflow/generate-single-portrait',
+          input: [objectKey, name, title, style],
+        }),
+      }).then(r => r.json())
+    );
+
+    const taskRuns = await Promise.all(startPromises);
+    const taskRunIds = taskRuns.map(r => r.id);
+    console.log(`[portraits] Started 3 tasks: ${taskRunIds.join(', ')}`);
+
+    // Wait for all 3 in background, then clean up object storage
     Promise.all(
-      PORTRAIT_STYLES.map(async (style) => {
-        const imageFile = await openai.toFile(imageBuffer, 'photo.png', { type: 'image/png' });
-        return generatePortrait(openai, imageFile, name, title, style);
-      })
-    ).then((images) => {
+      taskRunIds.map(id => render.workflows.waitForTask(id))
+    ).then((results) => {
       console.log(`[portraits] All 3 completed for session ${sessionId}`);
       const session = portraitSessions.get(sessionId);
       if (!session) return;
+      const images = results.map(r => r.results?.[0] || r.results);
       session.status = 'ready';
       session.images = images;
+
+      // Clean up uploaded photo
+      render.experimental.storage.objects.delete({
+        ownerId: OWNER_ID, region: REGION, key: objectKey,
+      }).catch(() => {});
     }).catch((err) => {
       console.error(`[portraits] Error: ${err.message}`);
       const session = portraitSessions.get(sessionId);
