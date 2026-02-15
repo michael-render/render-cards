@@ -32,6 +32,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Auto-save to gallery once the card image loads
+  const cardPhoto = document.getElementById('card-photo');
+  const onReady = async () => {
+    try {
+      const card = document.getElementById('card');
+      const pngDataUrl = await htmlToImage.toPng(card, {
+        pixelRatio: 3,
+        cacheBust: true
+      });
+      await saveCard(pngDataUrl);
+    } catch (err) {
+      console.warn('Auto-save to gallery failed:', err.message);
+    }
+  };
+  if (cardPhoto.complete) {
+    onReady();
+  } else {
+    cardPhoto.addEventListener('load', onReady);
+  }
+
   // Download PNG
   document.getElementById('download-btn').addEventListener('click', async () => {
     const btn = document.getElementById('download-btn');
@@ -49,9 +69,6 @@ document.addEventListener('DOMContentLoaded', () => {
       link.download = `${(data.name || 'card').replace(/\s+/g, '_')}_render_card.png`;
       link.href = dataUrl;
       link.click();
-
-      // Save to gallery before user navigates away
-      await saveCard(dataUrl);
     } catch (err) {
       console.error('PNG generation failed:', err);
       alert('Failed to generate PNG. Try again.');
