@@ -76,7 +76,7 @@ router.post('/generate-stats', async (req, res) => {
   }
 });
 
-// Enhance uploaded photo: vision description → DALL-E stylized portrait
+// Enhance uploaded photo: gpt-image-1 stylized portrait (photo → portrait directly)
 router.post('/enhance-photo', async (req, res) => {
   const { photo, name, title } = req.body;
   const openai = getOpenAI();
@@ -86,40 +86,18 @@ router.post('/enhance-photo', async (req, res) => {
   }
 
   try {
-    // Step 1: Use GPT-4o-mini vision to describe the person in the photo
-    const visionRes = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{
-        role: 'system',
-        content: 'Describe this person\'s physical appearance concisely: hair color/style, skin tone, facial features, expression, glasses, facial hair, and any distinguishing characteristics. Keep it to 2-3 sentences.'
-      }, {
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: photo } }
-        ]
-      }]
-    });
+    const prompt = `A stylized premium trading card portrait of ${name}, ${title}. Dramatic collectible card style with rich gold and dark tones, cinematic rim lighting, intense atmosphere. Upper body portrait, facing the viewer.`;
 
-    const description = visionRes.choices[0].message.content;
-
-    // Step 2: Generate a stylized trading card portrait with DALL-E 3
-    const dallePrompt = `A stylized premium trading card portrait of ${name}, ${title}. Based on this appearance: ${description}. Painted in a dramatic, collectible card style with rich gold and dark tones, cinematic lighting, and a polished background. Upper body portrait, facing the viewer.`;
-
-    const imageRes = await openai.images.generate({
-      model: 'dall-e-3',
-      prompt: dallePrompt,
-      n: 1,
+    const result = await openai.images.edit({
+      model: 'gpt-image-1',
+      image: photo,
+      prompt,
+      input_fidelity: 'high',
       size: '1024x1024',
-      quality: 'standard'
+      quality: 'medium',
     });
 
-    // Fetch the image and convert to base64 data URL to avoid client-side CORS issues
-    const imageUrl = imageRes.data[0].url;
-    const imgResp = await fetch(imageUrl);
-    const arrBuf = await imgResp.arrayBuffer();
-    const base64 = Buffer.from(arrBuf).toString('base64');
-    const dataUrl = `data:image/png;base64,${base64}`;
-
+    const dataUrl = `data:image/png;base64,${result.data[0].b64_json}`;
     res.json({ image: dataUrl });
   } catch (err) {
     console.error('Photo enhancement error:', err.message);
@@ -161,60 +139,41 @@ router.post('/generate-image', async (req, res) => {
 
 // ── Multi-Portrait via Render Workflows ──
 
-const PORTRAIT_STYLE = 'Dramatic collectible card style with rich gold and dark tones, cinematic lighting';
+const PORTRAIT_STYLES = [
+  'Dramatic collectible card style with rich gold and dark tones, cinematic rim lighting, intense atmosphere',
+  'Premium card portrait with warm cinematic lighting, rich amber and dark tones, refined detail',
+  'Bold collectible card style with deep shadows, golden accents, sharp dramatic lighting',
+];
 
 router.post('/enhance-photo-multi', async (req, res) => {
   const { photo, name, title } = req.body;
-  const openai = getOpenAI();
   const render = getRender();
 
-  if (!openai || !render || !photo) {
+  if (!process.env.OPENAI_API_KEY || !render || !photo) {
     return res.status(400).json({ error: 'AI or Workflows not available' });
   }
 
   try {
-    // Step 1: Vision call to get 3 different descriptions of the person
-    const visionRes = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{
-        role: 'system',
-        content: 'You describe people\'s physical appearance for portrait generation. Given a photo, produce exactly 3 different descriptions of the same person. Each should be 2-3 sentences covering hair, skin tone, facial features, expression, glasses, facial hair, and distinguishing characteristics. Vary the emphasis and wording between descriptions so each produces a distinct portrait. Return as JSON: {"descriptions": ["...", "...", "..."]}'
-      }, {
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: photo } }
-        ]
-      }],
-      response_format: { type: 'json_object' }
-    });
-
-    const parsed = JSON.parse(visionRes.choices[0].message.content);
-    const descriptions = parsed.descriptions;
-
-    if (!Array.isArray(descriptions) || descriptions.length < 3) {
-      throw new Error('Vision call did not return 3 descriptions');
-    }
-
-    // Step 2: Create session in pending state
+    // Create session in pending state
     const sessionId = crypto.randomUUID();
     portraitSessions.set(sessionId, {
       status: 'pending',
       createdAt: Date.now(),
     });
 
-    // Step 3: Start 3 individual subtasks in parallel, each with a different description
+    // Start 3 individual subtasks in parallel, each with photo + different style
     const headers = {
       'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
       'Content-Type': 'application/json',
     };
 
-    const startPromises = descriptions.slice(0, 3).map((desc) =>
+    const startPromises = PORTRAIT_STYLES.map((style) =>
       fetch('https://api.render.com/v1/task-runs', {
         method: 'POST',
         headers,
         body: JSON.stringify({
           task: 'render-cards-workflow/generate-single-portrait',
-          input: [desc, name, title, PORTRAIT_STYLE],
+          input: [photo, name, title, style],
         }),
       }).then(r => r.json())
     );
@@ -223,14 +182,13 @@ router.post('/enhance-photo-multi', async (req, res) => {
     const taskRunIds = taskRuns.map(r => r.id);
     console.log(`[workflow] Started 3 tasks: ${taskRunIds.join(', ')}`);
 
-    // Step 4: Wait for all 3 via SSE in background
+    // Wait for all 3 via SSE in background
     Promise.all(
       taskRunIds.map(id => render.workflows.waitForTask(id))
     ).then((results) => {
       console.log(`[workflow] All 3 completed for session ${sessionId}`);
       const session = portraitSessions.get(sessionId);
       if (!session) return;
-      // Each result has .results array with one element (the return value)
       const images = results.map(r => r.results?.[0] || r.results);
       console.log(`[workflow] Storing ${images.length} images`);
       session.status = 'ready';
