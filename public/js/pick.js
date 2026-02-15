@@ -28,15 +28,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = '/';
   });
 
-  // Fetch portraits
-  status.textContent = 'Loading portraits...';
+  // Poll for portraits until ready
+  status.textContent = 'Generating 3 AI portrait styles...';
+  const POLL_INTERVAL = 3000;
+  const MAX_POLLS = 60;
+
+  let data;
   try {
-    const res = await fetch(`/api/portraits/${sessionId}`);
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Session expired');
+    for (let i = 0; i < MAX_POLLS; i++) {
+      const res = await fetch(`/api/portraits/${sessionId}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        if (res.status === 404) throw new Error('Session expired');
+        if (res.status === 500) throw new Error(err.error || 'Generation failed');
+        throw new Error(err.error || 'Unexpected error');
+      }
+
+      data = await res.json();
+
+      if (data.status === 'ready') break;
+
+      if (data.status === 'failed') {
+        throw new Error(data.error || 'Portrait generation failed');
+      }
+
+      // Still pending — wait and poll again
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL));
     }
-    const data = await res.json();
+
+    if (!data || data.status !== 'ready') {
+      throw new Error('Timed out waiting for portraits');
+    }
 
     if (!data.images || data.images.length === 0) {
       throw new Error('No portraits available');
@@ -96,7 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.error(err);
     status.textContent = err.message === 'Session expired'
       ? 'Session expired. Redirecting...'
-      : 'Failed to load portraits. Redirecting...';
+      : err.message || 'Failed to load portraits. Redirecting...';
     status.className = 'pick-status error';
     setTimeout(() => { window.location.href = '/'; }, 2000);
   }

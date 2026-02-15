@@ -171,7 +171,7 @@ router.post('/enhance-photo-multi', async (req, res) => {
   }
 
   try {
-    // Step 1: Vision call to describe the person
+    // Step 1: Vision call to describe the person (fast, ~2-3s)
     const visionRes = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [{
@@ -187,21 +187,36 @@ router.post('/enhance-photo-multi', async (req, res) => {
 
     const description = visionRes.choices[0].message.content;
 
-    // Step 2: Run workflow parent task (fans out to 3 DALL-E calls in parallel)
-    const taskRun = await render.workflows.runTask(
-      'render-cards-workflow/generate-portraits',
-      [description, name, title]
-    );
+    // Step 2: Start workflow (non-blocking) via REST API
+    const taskRes = await fetch('https://api.render.com/v1/workflows/tasks/run', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        task: 'render-cards-workflow/generate-portraits',
+        input: [description, name, title],
+      }),
+    });
 
-    const images = taskRun.results;
-
-    if (!images || !Array.isArray(images) || images.length === 0) {
-      return res.status(500).json({ error: 'Workflow returned no images' });
+    if (!taskRes.ok) {
+      const errBody = await taskRes.text();
+      throw new Error(`Workflow start failed: ${taskRes.status} ${errBody}`);
     }
 
-    // Step 3: Store in session
+    const taskRun = await taskRes.json();
+
+    // Step 3: Create session in pending state, resolve in background
     const sessionId = crypto.randomUUID();
-    portraitSessions.set(sessionId, { images, createdAt: Date.now() });
+    portraitSessions.set(sessionId, {
+      status: 'pending',
+      taskRunId: taskRun.id,
+      createdAt: Date.now(),
+    });
+
+    // Poll workflow in background and store results when done
+    resolveWorkflow(render, sessionId, taskRun.id);
 
     res.json({ sessionId });
   } catch (err) {
@@ -210,18 +225,71 @@ router.post('/enhance-photo-multi', async (req, res) => {
   }
 });
 
+// Background poller: check workflow status until complete, then store images
+async function resolveWorkflow(render, sessionId, taskRunId) {
+  try {
+    const POLL_INTERVAL = 3000;
+    const MAX_POLLS = 60; // 3 minutes max
+    for (let i = 0; i < MAX_POLLS; i++) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL));
+
+      const session = portraitSessions.get(sessionId);
+      if (!session) return; // session expired/deleted
+
+      const run = await render.workflows.getTaskRun(taskRunId);
+
+      if (run.status === 'completed') {
+        // results is wrapped in an array: [[img1, img2, img3]]
+        const images = Array.isArray(run.results?.[0]) ? run.results[0] : run.results;
+        session.status = 'ready';
+        session.images = images;
+        return;
+      }
+
+      if (run.status === 'failed' || run.status === 'cancelled') {
+        session.status = 'failed';
+        session.error = run.error || 'Workflow failed';
+        return;
+      }
+    }
+
+    // Timed out
+    const session = portraitSessions.get(sessionId);
+    if (session && session.status === 'pending') {
+      session.status = 'failed';
+      session.error = 'Workflow timed out';
+    }
+  } catch (err) {
+    console.error('Workflow poll error:', err.message);
+    const session = portraitSessions.get(sessionId);
+    if (session) {
+      session.status = 'failed';
+      session.error = err.message;
+    }
+  }
+}
+
 router.get('/portraits/:sessionId', (req, res) => {
   const session = portraitSessions.get(req.params.sessionId);
   if (!session) {
     return res.status(404).json({ error: 'Session expired or not found' });
   }
-  res.json({ images: session.images });
+  if (session.status === 'pending') {
+    return res.json({ status: 'pending' });
+  }
+  if (session.status === 'failed') {
+    return res.status(500).json({ status: 'failed', error: session.error });
+  }
+  res.json({ status: 'ready', images: session.images });
 });
 
 router.get('/portraits/:sessionId/:index', (req, res) => {
   const session = portraitSessions.get(req.params.sessionId);
   if (!session) {
     return res.status(404).json({ error: 'Session expired or not found' });
+  }
+  if (session.status !== 'ready') {
+    return res.status(400).json({ error: 'Portraits not ready yet' });
   }
   const idx = parseInt(req.params.index, 10);
   if (isNaN(idx) || idx < 0 || idx >= session.images.length) {
