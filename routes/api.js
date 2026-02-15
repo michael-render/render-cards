@@ -206,6 +206,7 @@ router.post('/enhance-photo-multi', async (req, res) => {
     }
 
     const taskRun = await taskRes.json();
+    console.log('Workflow started, task run:', JSON.stringify({ id: taskRun.id, status: taskRun.status, keys: Object.keys(taskRun) }));
 
     // Step 3: Create session in pending state, resolve in background
     const sessionId = crypto.randomUUID();
@@ -227,6 +228,7 @@ router.post('/enhance-photo-multi', async (req, res) => {
 
 // Background poller: check workflow status until complete, then store images
 async function resolveWorkflow(render, sessionId, taskRunId) {
+  console.log(`[resolveWorkflow] Starting poll for session=${sessionId} taskRun=${taskRunId}`);
   try {
     const POLL_INTERVAL = 3000;
     const MAX_POLLS = 60; // 3 minutes max
@@ -234,19 +236,29 @@ async function resolveWorkflow(render, sessionId, taskRunId) {
       await new Promise((r) => setTimeout(r, POLL_INTERVAL));
 
       const session = portraitSessions.get(sessionId);
-      if (!session) return; // session expired/deleted
+      if (!session) {
+        console.log(`[resolveWorkflow] Session ${sessionId} gone, stopping`);
+        return;
+      }
 
+      console.log(`[resolveWorkflow] Poll ${i + 1}/${MAX_POLLS} for taskRun=${taskRunId}`);
       const run = await render.workflows.getTaskRun(taskRunId);
+      console.log(`[resolveWorkflow] Status: ${run.status}, hasResults: ${!!run.results}, resultKeys: ${JSON.stringify(Object.keys(run))}`);
 
       if (run.status === 'completed') {
-        // results is wrapped in an array: [[img1, img2, img3]]
+        console.log(`[resolveWorkflow] Completed! results type: ${typeof run.results}, isArray: ${Array.isArray(run.results)}, length: ${run.results?.length}`);
+        if (Array.isArray(run.results) && run.results.length > 0) {
+          console.log(`[resolveWorkflow] results[0] type: ${typeof run.results[0]}, isArray: ${Array.isArray(run.results[0])}`);
+        }
         const images = Array.isArray(run.results?.[0]) ? run.results[0] : run.results;
+        console.log(`[resolveWorkflow] Storing ${images?.length} images`);
         session.status = 'ready';
         session.images = images;
         return;
       }
 
       if (run.status === 'failed' || run.status === 'cancelled') {
+        console.log(`[resolveWorkflow] Failed/cancelled: ${JSON.stringify(run.error || run)}`);
         session.status = 'failed';
         session.error = run.error || 'Workflow failed';
         return;
@@ -254,13 +266,14 @@ async function resolveWorkflow(render, sessionId, taskRunId) {
     }
 
     // Timed out
+    console.log(`[resolveWorkflow] Timed out after ${MAX_POLLS} polls`);
     const session = portraitSessions.get(sessionId);
     if (session && session.status === 'pending') {
       session.status = 'failed';
       session.error = 'Workflow timed out';
     }
   } catch (err) {
-    console.error('Workflow poll error:', err.message);
+    console.error(`[resolveWorkflow] Error: ${err.message}`, err.stack);
     const session = portraitSessions.get(sessionId);
     if (session) {
       session.status = 'failed';
