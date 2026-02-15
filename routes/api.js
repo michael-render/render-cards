@@ -102,9 +102,8 @@ router.post('/enhance-photo', async (req, res) => {
       model: 'gpt-image-1',
       image: imageFile,
       prompt,
-      input_fidelity: 'high',
       size: '1024x1024',
-      quality: 'medium',
+      quality: 'low',
     });
 
     const dataUrl = `data:image/png;base64,${result.data[0].b64_json}`;
