@@ -188,7 +188,7 @@ router.post('/enhance-photo-multi', async (req, res) => {
     const description = visionRes.choices[0].message.content;
 
     // Step 2: Start workflow (non-blocking) via REST API
-    const taskRes = await fetch('https://api.render.com/v1/workflows/tasks/run', {
+    const taskRes = await fetch('https://api.render.com/v1/task-runs', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
