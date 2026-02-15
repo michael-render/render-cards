@@ -187,37 +187,34 @@ router.post('/enhance-photo-multi', async (req, res) => {
 
     const description = visionRes.choices[0].message.content;
 
-    // Step 2: Start workflow (non-blocking) via REST API
-    const taskRes = await fetch('https://api.render.com/v1/task-runs', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        task: 'render-cards-workflow/generate-portraits',
-        input: [description, name, title],
-      }),
-    });
-
-    if (!taskRes.ok) {
-      const errBody = await taskRes.text();
-      throw new Error(`Workflow start failed: ${taskRes.status} ${errBody}`);
-    }
-
-    const taskRun = await taskRes.json();
-    console.log('Workflow started, task run:', JSON.stringify({ id: taskRun.id, status: taskRun.status, keys: Object.keys(taskRun) }));
-
-    // Step 3: Create session in pending state, resolve in background
+    // Step 2: Create session, then run workflow in background
     const sessionId = crypto.randomUUID();
     portraitSessions.set(sessionId, {
       status: 'pending',
-      taskRunId: taskRun.id,
       createdAt: Date.now(),
     });
 
-    // Poll workflow in background and store results when done
-    resolveWorkflow(render, sessionId, taskRun.id);
+    // Fire off runTask in background (it awaits completion via SSE internally)
+    render.workflows.runTask(
+      'render-cards-workflow/generate-portraits',
+      [description, name, title]
+    ).then((taskRun) => {
+      console.log(`[workflow] Completed! results type: ${typeof taskRun.results}, isArray: ${Array.isArray(taskRun.results)}, length: ${taskRun.results?.length}`);
+      const session = portraitSessions.get(sessionId);
+      if (!session) return;
+      // runTask wraps return value in array: [[img1, img2, img3]]
+      const images = Array.isArray(taskRun.results?.[0]) ? taskRun.results[0] : taskRun.results;
+      console.log(`[workflow] Storing ${images?.length} images for session ${sessionId}`);
+      session.status = 'ready';
+      session.images = images;
+    }).catch((err) => {
+      console.error(`[workflow] Error: ${err.message}`);
+      const session = portraitSessions.get(sessionId);
+      if (session) {
+        session.status = 'failed';
+        session.error = err.message;
+      }
+    });
 
     res.json({ sessionId });
   } catch (err) {
@@ -225,62 +222,6 @@ router.post('/enhance-photo-multi', async (req, res) => {
     res.status(500).json({ error: 'Failed to generate portraits' });
   }
 });
-
-// Background poller: check workflow status until complete, then store images
-async function resolveWorkflow(render, sessionId, taskRunId) {
-  console.log(`[resolveWorkflow] Starting poll for session=${sessionId} taskRun=${taskRunId}`);
-  try {
-    const POLL_INTERVAL = 3000;
-    const MAX_POLLS = 60; // 3 minutes max
-    for (let i = 0; i < MAX_POLLS; i++) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL));
-
-      const session = portraitSessions.get(sessionId);
-      if (!session) {
-        console.log(`[resolveWorkflow] Session ${sessionId} gone, stopping`);
-        return;
-      }
-
-      console.log(`[resolveWorkflow] Poll ${i + 1}/${MAX_POLLS} for taskRun=${taskRunId}`);
-      const run = await render.workflows.getTaskRun(taskRunId);
-      console.log(`[resolveWorkflow] Status: ${run.status}, hasResults: ${!!run.results}, resultKeys: ${JSON.stringify(Object.keys(run))}`);
-
-      if (run.status === 'completed') {
-        console.log(`[resolveWorkflow] Completed! results type: ${typeof run.results}, isArray: ${Array.isArray(run.results)}, length: ${run.results?.length}`);
-        if (Array.isArray(run.results) && run.results.length > 0) {
-          console.log(`[resolveWorkflow] results[0] type: ${typeof run.results[0]}, isArray: ${Array.isArray(run.results[0])}`);
-        }
-        const images = Array.isArray(run.results?.[0]) ? run.results[0] : run.results;
-        console.log(`[resolveWorkflow] Storing ${images?.length} images`);
-        session.status = 'ready';
-        session.images = images;
-        return;
-      }
-
-      if (run.status === 'failed' || run.status === 'cancelled') {
-        console.log(`[resolveWorkflow] Failed/cancelled: ${JSON.stringify(run.error || run)}`);
-        session.status = 'failed';
-        session.error = run.error || 'Workflow failed';
-        return;
-      }
-    }
-
-    // Timed out
-    console.log(`[resolveWorkflow] Timed out after ${MAX_POLLS} polls`);
-    const session = portraitSessions.get(sessionId);
-    if (session && session.status === 'pending') {
-      session.status = 'failed';
-      session.error = 'Workflow timed out';
-    }
-  } catch (err) {
-    console.error(`[resolveWorkflow] Error: ${err.message}`, err.stack);
-    const session = portraitSessions.get(sessionId);
-    if (session) {
-      session.status = 'failed';
-      session.error = err.message;
-    }
-  }
-}
 
 router.get('/portraits/:sessionId', (req, res) => {
   const session = portraitSessions.get(req.params.sessionId);
