@@ -161,6 +161,12 @@ router.post('/generate-image', async (req, res) => {
 
 // ── Multi-Portrait via Render Workflows ──
 
+const STYLE_PROMPTS = [
+  'Dramatic collectible card style with rich gold and dark tones, cinematic lighting',
+  'Watercolor artistic style with soft flowing colors and painterly brushstrokes',
+  'Bold comic book pop art style with strong outlines, vibrant flat colors, and dynamic energy',
+];
+
 router.post('/enhance-photo-multi', async (req, res) => {
   const { photo, name, title } = req.body;
   const openai = getOpenAI();
@@ -187,24 +193,44 @@ router.post('/enhance-photo-multi', async (req, res) => {
 
     const description = visionRes.choices[0].message.content;
 
-    // Step 2: Create session, then run workflow in background
+    // Step 2: Create session in pending state
     const sessionId = crypto.randomUUID();
     portraitSessions.set(sessionId, {
       status: 'pending',
       createdAt: Date.now(),
     });
 
-    // Fire off runTask in background (it awaits completion via SSE internally)
-    render.workflows.runTask(
-      'render-cards-workflow/generate-portraits',
-      [description, name, title]
-    ).then((taskRun) => {
-      console.log(`[workflow] Completed! results type: ${typeof taskRun.results}, isArray: ${Array.isArray(taskRun.results)}, length: ${taskRun.results?.length}`);
+    // Step 3: Start 3 individual subtasks in parallel (avoids parent task SSE issues)
+    const headers = {
+      'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
+      'Content-Type': 'application/json',
+    };
+
+    const startPromises = STYLE_PROMPTS.map((style) =>
+      fetch('https://api.render.com/v1/task-runs', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          task: 'render-cards-workflow/generate-single-portrait',
+          input: [description, name, title, style],
+        }),
+      }).then(r => r.json())
+    );
+
+    const taskRuns = await Promise.all(startPromises);
+    const taskRunIds = taskRuns.map(r => r.id);
+    console.log(`[workflow] Started 3 tasks: ${taskRunIds.join(', ')}`);
+
+    // Step 4: Wait for all 3 via SSE in background
+    Promise.all(
+      taskRunIds.map(id => render.workflows.waitForTask(id))
+    ).then((results) => {
+      console.log(`[workflow] All 3 completed for session ${sessionId}`);
       const session = portraitSessions.get(sessionId);
       if (!session) return;
-      // runTask wraps return value in array: [[img1, img2, img3]]
-      const images = Array.isArray(taskRun.results?.[0]) ? taskRun.results[0] : taskRun.results;
-      console.log(`[workflow] Storing ${images?.length} images for session ${sessionId}`);
+      // Each result has .results array with one element (the return value)
+      const images = results.map(r => r.results?.[0] || r.results);
+      console.log(`[workflow] Storing ${images.length} images`);
       session.status = 'ready';
       session.images = images;
     }).catch((err) => {
