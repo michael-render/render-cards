@@ -1,4 +1,4 @@
-const { task, startTaskServer } = require('@renderinc/sdk');
+const { task, startTaskServer } = require('@renderinc/sdk/workflows');
 const OpenAI = require('openai');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
