@@ -172,6 +172,7 @@ router.post('/enhance-photo-multi', async (req, res) => {
     const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
 
+    console.log(`[portraits] Uploading photo to object storage: ${objectKey} (${imageBuffer.length} bytes, ownerId=${OWNER_ID})`);
     await render.experimental.storage.objects.put({
       ownerId: OWNER_ID,
       region: REGION,
@@ -179,7 +180,7 @@ router.post('/enhance-photo-multi', async (req, res) => {
       data: imageBuffer,
       contentType: 'image/png',
     });
-    console.log(`[portraits] Uploaded photo to object storage: ${objectKey} (${imageBuffer.length} bytes)`);
+    console.log(`[portraits] Upload complete`);
 
     // Create session in pending state
     const sessionId = crypto.randomUUID();
@@ -235,7 +236,7 @@ router.post('/enhance-photo-multi', async (req, res) => {
 
     res.json({ sessionId });
   } catch (err) {
-    console.error('Multi-portrait error:', err.message);
+    console.error('Multi-portrait error:', err.message, err.stack);
     res.status(500).json({ error: 'Failed to generate portraits' });
   }
 });
