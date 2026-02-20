@@ -96,7 +96,8 @@ router.post('/enhance-photo', async (req, res) => {
     // Convert data URL to File object for the SDK
     const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
-    const imageFile = await openai.toFile(imageBuffer, 'photo.png', { type: 'image/png' });
+    const { toFile } = require('openai');
+    const imageFile = await toFile(imageBuffer, 'photo.png', { type: 'image/png' });
 
     const result = await openai.images.edit({
       model: 'gpt-image-1',

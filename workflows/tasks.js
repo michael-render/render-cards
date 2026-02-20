@@ -1,6 +1,7 @@
 const { task, startTaskServer } = require('@renderinc/sdk/workflows');
 const { Render } = require('@renderinc/sdk');
 const OpenAI = require('openai');
+const { toFile } = require('openai');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const render = new Render({ token: process.env.RENDER_API_KEY });
@@ -25,7 +26,7 @@ task(
     const prompt = `A stylized premium trading card portrait of ${name}, ${title}. ${stylePrompt}. Upper body portrait, facing the viewer.`;
 
     // Convert buffer to File object for the SDK
-    const imageFile = await openai.toFile(obj.data, 'photo.png', { type: 'image/png' });
+    const imageFile = await toFile(obj.data, 'photo.png', { type: 'image/png' });
     console.log('[task] Calling images.edit...');
 
     const result = await openai.images.edit({
