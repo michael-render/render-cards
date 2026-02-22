@@ -172,14 +172,25 @@ router.post('/enhance-photo-multi', async (req, res) => {
     const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
 
-    console.log(`[portraits] Uploading photo to object storage: ${objectKey} (${imageBuffer.length} bytes, ownerId=${OWNER_ID})`);
-    await render.experimental.storage.objects.put({
-      ownerId: OWNER_ID,
-      region: REGION,
-      key: objectKey,
-      data: imageBuffer,
-      contentType: 'image/png',
+    // Upload to object storage via presigned URL (bypassing SDK to avoid Content-Type signature mismatch)
+    console.log(`[portraits] Uploading photo to object storage: ${objectKey} (${imageBuffer.length} bytes)`);
+    const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${objectKey}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ sizeBytes: imageBuffer.length }),
     });
+    if (!presignResp.ok) throw new Error(`Failed to get upload URL: ${presignResp.status}`);
+    const { url: uploadUrl } = await presignResp.json();
+
+    const uploadResp = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Length': imageBuffer.length.toString() },
+      body: imageBuffer,
+    });
+    if (!uploadResp.ok) throw new Error(`Upload failed: ${uploadResp.status} ${uploadResp.statusText}`);
     console.log(`[portraits] Upload complete`);
 
     // Create session in pending state
