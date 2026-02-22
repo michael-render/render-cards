@@ -1,5 +1,6 @@
 const { task, startTaskServer } = require('@renderinc/sdk/workflows');
 const { Render } = require('@renderinc/sdk');
+const crypto = require('crypto');
 const OpenAI = require('openai');
 const { toFile } = require('openai');
 
@@ -10,6 +11,7 @@ const OWNER_ID = process.env.RENDER_OWNER_ID || '';
 const REGION = 'oregon';
 
 // Generate a single stylized portrait via gpt-image-1 (photo from object storage)
+// Returns an object storage key for the result (not the full base64, to avoid size limits)
 task(
   { name: 'generate-single-portrait', retry: { maxRetries: 1, waitDurationMs: 2000 } },
   async function generateSinglePortrait(objectKey, name, title, stylePrompt) {
@@ -38,7 +40,30 @@ task(
     });
 
     console.log('[task] images.edit completed successfully');
-    return `data:image/png;base64,${result.data[0].b64_json}`;
+
+    // Upload result to object storage (returning large base64 as task result is unreliable)
+    const resultKey = `portraits/result-${crypto.randomUUID()}.png`;
+    const resultBuffer = Buffer.from(result.data[0].b64_json, 'base64');
+
+    const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${resultKey}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ sizeBytes: resultBuffer.length }),
+    });
+    if (!presignResp.ok) throw new Error(`Failed to get upload URL: ${presignResp.status}`);
+    const { url: uploadUrl } = await presignResp.json();
+
+    await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Length': resultBuffer.length.toString() },
+      body: resultBuffer,
+    });
+    console.log(`[task] Uploaded result to ${resultKey} (${resultBuffer.length} bytes)`);
+
+    return resultKey;
   }
 );
 

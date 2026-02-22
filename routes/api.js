@@ -221,21 +221,40 @@ router.post('/enhance-photo-multi', async (req, res) => {
     const taskRunIds = taskRuns.map(r => r.id);
     console.log(`[portraits] Started 3 tasks: ${taskRunIds.join(', ')}`);
 
-    // Wait for all 3 in background, then clean up object storage
+    // Wait for all 3 in background, download results from object storage
     Promise.all(
       taskRunIds.map(id => render.workflows.waitForTask(id))
-    ).then((results) => {
+    ).then(async (results) => {
       console.log(`[portraits] All 3 completed for session ${sessionId}`);
       const session = portraitSessions.get(sessionId);
       if (!session) return;
-      const images = results.map(r => r.results?.[0] || r.results);
+
+      // Results are object storage keys — download and convert to data URLs
+      const resultKeys = results.map(r => r.results?.[0] || r.results);
+      console.log(`[portraits] Downloading results: ${resultKeys.join(', ')}`);
+
+      const images = await Promise.all(resultKeys.map(async (key) => {
+        try {
+          const obj = await render.experimental.storage.objects.get({
+            ownerId: OWNER_ID, region: REGION, key,
+          });
+          return `data:image/png;base64,${obj.data.toString('base64')}`;
+        } catch (err) {
+          console.error(`[portraits] Failed to download result ${key}: ${err.message}`);
+          return null;
+        }
+      }));
+
       session.status = 'ready';
       session.images = images;
 
-      // Clean up uploaded photo
-      render.experimental.storage.objects.delete({
-        ownerId: OWNER_ID, region: REGION, key: objectKey,
-      }).catch(() => {});
+      // Clean up all objects (source photo + result portraits)
+      const keysToDelete = [objectKey, ...resultKeys];
+      for (const key of keysToDelete) {
+        render.experimental.storage.objects.delete({
+          ownerId: OWNER_ID, region: REGION, key,
+        }).catch(() => {});
+      }
     }).catch((err) => {
       console.error(`[portraits] Error: ${err.message}`);
       const session = portraitSessions.get(sessionId);
