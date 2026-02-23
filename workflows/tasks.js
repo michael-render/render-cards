@@ -99,29 +99,45 @@ const verifyLikeness = task(
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages: [{
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: 'I have two images: the first is an original photo of a person, and the second is a stylized portrait generated from that photo. Is the person in the portrait recognizably the same person as in the original photo? Consider facial structure, key features, and overall likeness. Respond with JSON: {"match": true/false, "reason": "brief explanation"}',
-          },
-          {
-            type: 'image_url',
-            image_url: { url: `data:image/png;base64,${originalB64}` },
-          },
-          {
-            type: 'image_url',
-            image_url: { url: `data:image/png;base64,${portraitB64}` },
-          },
-        ],
-      }],
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a strict quality-control judge for AI-generated portraits. Your job is to REJECT portraits that don\'t look like the original person. Be critical — when in doubt, reject. Most AI portraits fail to preserve likeness, so "match": false should be your default unless the resemblance is clearly strong.',
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `Image 1 is the original photo. Image 2 is a stylized portrait that should depict the same person.
+
+Score each criterion pass/fail:
+1. FACE SHAPE: Does the portrait preserve the original face shape (round, oval, square, etc.)?
+2. SKIN TONE: Is the skin tone consistent with the original?
+3. HAIR: Does the hair color, style, and length match?
+4. DISTINGUISHING FEATURES: Are distinctive features preserved (glasses, facial hair, nose shape, etc.)?
+5. OVERALL IMPRESSION: Would someone who knows this person recognize them in the portrait?
+
+Respond with JSON: {"match": true/false, "passed": <number of criteria passed out of 5>, "reason": "which criteria failed and why"}
+Set "match": true ONLY if at least 4 of 5 criteria pass.`,
+            },
+            {
+              type: 'image_url',
+              image_url: { url: `data:image/png;base64,${originalB64}` },
+            },
+            {
+              type: 'image_url',
+              image_url: { url: `data:image/png;base64,${portraitB64}` },
+            },
+          ],
+        },
+      ],
       response_format: { type: 'json_object' },
-      max_tokens: 200,
+      max_tokens: 300,
     });
 
     const result = JSON.parse(response.choices[0].message.content);
-    console.log(`[verify] match=${result.match}, reason=${result.reason}`);
+    console.log(`[verify] match=${result.match}, passed=${result.passed}/5, reason=${result.reason}`);
     return result;
   }
 );
