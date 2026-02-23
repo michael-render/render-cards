@@ -1,11 +1,9 @@
 const { task, startTaskServer } = require('@renderinc/sdk/workflows');
-const { Render } = require('@renderinc/sdk');
 const crypto = require('crypto');
 const OpenAI = require('openai');
 const { toFile } = require('openai');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const render = new Render({ token: process.env.RENDER_API_KEY });
 
 const OWNER_ID = process.env.RENDER_OWNER_ID || '';
 const REGION = 'oregon';
@@ -30,20 +28,31 @@ async function uploadToStorage(key, buffer) {
   });
 }
 
-// ── Helper: download from object storage ──
+// ── Helper: download from object storage via presigned URL ──
 async function downloadFromStorage(key) {
-  const obj = await render.experimental.storage.objects.get({
-    ownerId: OWNER_ID,
-    region: REGION,
-    key,
+  const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${key}`, {
+    method: 'GET',
+    headers: { 'Authorization': `Bearer ${process.env.RENDER_API_KEY}` },
   });
-  return obj;
+  if (!presignResp.ok) {
+    const body = await presignResp.text().catch(() => '');
+    throw new Error(`Failed to get download URL for ${key}: ${presignResp.status} ${body}`);
+  }
+  const { url: downloadUrl } = await presignResp.json();
+
+  const dataResp = await fetch(downloadUrl);
+  if (!dataResp.ok) {
+    throw new Error(`Failed to download ${key}: ${dataResp.status}`);
+  }
+  const arrayBuf = await dataResp.arrayBuffer();
+  return { data: Buffer.from(arrayBuf), size: arrayBuf.byteLength };
 }
 
 // ── Helper: delete from object storage (fire-and-forget) ──
 function deleteFromStorage(key) {
-  render.experimental.storage.objects.delete({
-    ownerId: OWNER_ID, region: REGION, key,
+  fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${key}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': `Bearer ${process.env.RENDER_API_KEY}` },
   }).catch(() => {});
 }
 
