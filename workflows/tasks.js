@@ -44,24 +44,23 @@ async function verifyLikeness(originalB64, portraitB64) {
     messages: [
       {
         role: 'system',
-        content: 'You are a strict quality-control judge for AI-generated portraits. Your job is to REJECT portraits that don\'t look like the original person. Be critical — when in doubt, reject. Most AI portraits fail to preserve likeness, so "match": false should be your default unless the resemblance is clearly strong.',
+        content: 'You are a quality-control judge for stylized AI portraits. The portrait is INTENTIONALLY stylized — expect altered proportions, lighting, and artistic effects. Your job is to check whether the portrait clearly depicts the SAME PERSON, not whether it\'s a photorealistic copy. Only reject if the portrait looks like a completely different person.',
       },
       {
         role: 'user',
         content: [
           {
             type: 'text',
-            text: `Image 1 is the original photo. Image 2 is a stylized portrait that should depict the same person.
+            text: `Image 1 is the original photo. Image 2 is a stylized trading card portrait generated from that photo. The portrait will have artistic stylization — that's expected. Focus on whether the PERSON is recognizable.
 
 Score each criterion pass/fail:
-1. FACE SHAPE: Does the portrait preserve the original face shape (round, oval, square, etc.)?
-2. SKIN TONE: Is the skin tone consistent with the original?
-3. HAIR: Does the hair color, style, and length match?
-4. DISTINGUISHING FEATURES: Are distinctive features preserved (glasses, facial hair, nose shape, etc.)?
-5. OVERALL IMPRESSION: Would someone who knows this person recognize them in the portrait?
+1. HAIR: Is the hair color, length, and general style consistent?
+2. SKIN TONE: Is the skin tone approximately correct (not a different ethnicity/complexion)?
+3. DISTINGUISHING FEATURES: Are key identifiers preserved (glasses, facial hair, beard, scars, piercings, etc.)?
+4. OVERALL IDENTITY: Would someone who knows this person say "that's them" when seeing the portrait?
 
-Respond with JSON: {"match": true/false, "passed": <number of criteria passed out of 5>, "reason": "which criteria failed and why"}
-Set "match": true ONLY if at least 4 of 5 criteria pass.`,
+Respond with JSON: {"match": true/false, "passed": <number of criteria passed out of 4>, "reason": "which criteria failed and why"}
+Set "match": true if at least 3 of 4 criteria pass. Set "match": false only if the portrait looks like a different person.`,
           },
           {
             type: 'image_url',
@@ -79,7 +78,7 @@ Set "match": true ONLY if at least 4 of 5 criteria pass.`,
   });
 
   const result = JSON.parse(response.choices[0].message.content);
-  console.log(`[verify] match=${result.match}, passed=${result.passed}/5, reason=${result.reason}`);
+  console.log(`[verify] match=${result.match}, passed=${result.passed}/4, reason=${result.reason}`);
   return result;
 }
 
