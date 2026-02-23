@@ -211,7 +211,7 @@ router.post('/enhance-photo-multi', async (req, res) => {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          task: 'render-cards-workflow/generate-single-portrait',
+          task: 'render-cards-workflow/generate-verified-portrait',
           input: [objectKey, name, title, style],
         }),
       }).then(r => r.json())
