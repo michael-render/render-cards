@@ -91,16 +91,24 @@ const generatePortrait = task(
   async function generatePortrait(objectKey, name, title, stylePrompt) {
     console.log(`[generate] Starting portrait for ${name}, fetching photo: ${objectKey}`);
 
-    // Download original photo
-    const obj = await render.experimental.storage.objects.get({
-      ownerId: OWNER_ID, region: REGION, key: objectKey,
+    // Download original photo (direct fetch — SDK objects.get() fails in subtask workers)
+    const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${objectKey}`, {
+      headers: { 'Authorization': `Bearer ${process.env.RENDER_API_KEY}` },
     });
-    const originalB64 = obj.data.toString('base64');
-    console.log(`[generate] Downloaded photo: ${obj.size} bytes`);
+    if (!presignResp.ok) {
+      const body = await presignResp.text().catch(() => '');
+      throw new Error(`Failed to get download URL for ${objectKey}: ${presignResp.status} ${body}`);
+    }
+    const { url: downloadUrl } = await presignResp.json();
+    const photoResp = await fetch(downloadUrl);
+    if (!photoResp.ok) throw new Error(`Download failed: ${photoResp.status}`);
+    const photoBuffer = Buffer.from(await photoResp.arrayBuffer());
+    const originalB64 = photoBuffer.toString('base64');
+    console.log(`[generate] Downloaded photo: ${photoBuffer.length} bytes`);
 
     // Generate portrait
     const prompt = `A stylized premium trading card portrait of ${name}, ${title}. ${stylePrompt}. Upper body portrait, facing the viewer.`;
-    const imageFile = await toFile(obj.data, 'photo.png', { type: 'image/png' });
+    const imageFile = await toFile(photoBuffer, 'photo.png', { type: 'image/png' });
     console.log('[generate] Calling images.edit...');
 
     const result = await openai.images.edit({
