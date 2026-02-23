@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Poll for portraits until ready
   status.textContent = 'Generating 3 AI portrait styles...';
   const POLL_INTERVAL = 3000;
-  const MAX_POLLS = 60;
+  const MAX_POLLS = 100;
 
   let data;
   try {
