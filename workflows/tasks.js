@@ -149,10 +149,23 @@ task(
   async function generateVerifiedPortrait(objectKey, name, title, stylePrompt) {
     const MAX_ATTEMPTS = 3;
 
+    let lastResultKey = null;
+
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       console.log(`[orchestrator] Attempt ${attempt}/${MAX_ATTEMPTS} for ${name}`);
 
-      const resultKey = await generatePortrait(objectKey, name, title, stylePrompt);
+      let resultKey;
+      try {
+        resultKey = await generatePortrait(objectKey, name, title, stylePrompt);
+      } catch (err) {
+        console.error(`[orchestrator] generate-portrait failed on attempt ${attempt}: ${err.message || err}`);
+        if (attempt === MAX_ATTEMPTS) {
+          throw err; // no more retries, let the task fail
+        }
+        continue;
+      }
+
+      lastResultKey = resultKey;
 
       // On the final attempt, skip verification — return whatever we got
       if (attempt === MAX_ATTEMPTS) {
@@ -160,17 +173,27 @@ task(
         return resultKey;
       }
 
-      const verification = await verifyLikeness(objectKey, resultKey);
+      try {
+        const verification = await verifyLikeness(objectKey, resultKey);
 
-      if (verification.match) {
-        console.log(`[orchestrator] Likeness verified on attempt ${attempt}`);
+        if (verification.match) {
+          console.log(`[orchestrator] Likeness verified on attempt ${attempt}`);
+          return resultKey;
+        }
+
+        // Failed verification — delete the bad portrait and retry
+        console.log(`[orchestrator] Likeness failed on attempt ${attempt}, retrying...`);
+        deleteFromStorage(resultKey);
+      } catch (err) {
+        console.error(`[orchestrator] verify-likeness failed on attempt ${attempt}: ${err.message || err}`);
+        // Verification error — keep the portrait and return it rather than retrying blindly
+        console.log(`[orchestrator] Returning portrait despite verification error`);
         return resultKey;
       }
-
-      // Failed verification — delete the bad portrait and retry
-      console.log(`[orchestrator] Likeness failed on attempt ${attempt}, retrying...`);
-      deleteFromStorage(resultKey);
     }
+
+    // Should not reach here, but safety net
+    return lastResultKey;
   }
 );
 
