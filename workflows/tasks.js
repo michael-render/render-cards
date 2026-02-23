@@ -30,16 +30,6 @@ async function uploadToStorage(key, buffer) {
   });
 }
 
-// ── Helper: download from object storage ──
-async function downloadFromStorage(key) {
-  const obj = await render.experimental.storage.objects.get({
-    ownerId: OWNER_ID,
-    region: REGION,
-    key,
-  });
-  return obj;
-}
-
 // ── Helper: delete from object storage (fire-and-forget) ──
 function deleteFromStorage(key) {
   render.experimental.storage.objects.delete({
@@ -47,44 +37,8 @@ function deleteFromStorage(key) {
   }).catch(() => {});
 }
 
-// ── Task 1: generate-portrait ──
-// Downloads photo, generates stylized portrait via gpt-image-1, uploads result
-const generatePortrait = task(
-  { name: 'generate-portrait' },
-  async function generatePortrait(objectKey, name, title, stylePrompt) {
-    console.log(`[generate] Starting portrait for ${name}, fetching photo: ${objectKey}`);
-
-    const obj = await downloadFromStorage(objectKey);
-    console.log(`[generate] Downloaded photo: ${obj.size} bytes`);
-
-    const prompt = `A stylized premium trading card portrait of ${name}, ${title}. ${stylePrompt}. Upper body portrait, facing the viewer.`;
-
-    const imageFile = await toFile(obj.data, 'photo.png', { type: 'image/png' });
-    console.log('[generate] Calling images.edit...');
-
-    const result = await openai.images.edit({
-      model: 'gpt-image-1',
-      image: imageFile,
-      prompt,
-      size: '1024x1024',
-      quality: 'low',
-    });
-
-    console.log('[generate] images.edit completed successfully');
-
-    const resultKey = `portraits/result-${crypto.randomUUID()}.png`;
-    const resultBuffer = Buffer.from(result.data[0].b64_json, 'base64');
-
-    await uploadToStorage(resultKey, resultBuffer);
-    console.log(`[generate] Uploaded result to ${resultKey} (${resultBuffer.length} bytes)`);
-
-    return resultKey;
-  }
-);
-
-// ── Verify likeness (plain function, not a subtask) ──
+// ── Verify likeness (plain function) ──
 // Compares original photo and generated portrait via GPT-4o-mini vision.
-// Runs inline in the orchestrator to avoid subtask worker issues with object storage.
 async function verifyLikeness(originalB64, portraitB64) {
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -130,65 +84,74 @@ Set "match": true ONLY if at least 4 of 5 criteria pass.`,
   return result;
 }
 
-// ── Task 2: generate-verified-portrait (orchestrator) ──
-// Generates a portrait and verifies likeness, retrying up to 3 total attempts
+// ── Single task: generate + verify + retry, all in one process ──
+// Downloads photo once, then loops: generate portrait → verify likeness → retry if needed.
+// No subtasks — avoids worker spawn cascade and object storage 404s.
 task(
   { name: 'generate-verified-portrait' },
   async function generateVerifiedPortrait(objectKey, name, title, stylePrompt) {
     const MAX_ATTEMPTS = 3;
 
-    // Download original photo once for verification comparisons
-    const originalObj = await downloadFromStorage(objectKey);
-    const originalB64 = originalObj.data.toString('base64');
-    console.log(`[orchestrator] Downloaded original photo: ${originalObj.size} bytes`);
+    // Download photo once, keep in memory for all attempts
+    console.log(`[task] Downloading photo: ${objectKey}`);
+    const obj = await render.experimental.storage.objects.get({
+      ownerId: OWNER_ID, region: REGION, key: objectKey,
+    });
+    const photoBuffer = obj.data;
+    const originalB64 = photoBuffer.toString('base64');
+    console.log(`[task] Downloaded photo: ${obj.size} bytes`);
 
-    let lastResultKey = null;
+    const prompt = `A stylized premium trading card portrait of ${name}, ${title}. ${stylePrompt}. Upper body portrait, facing the viewer.`;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      console.log(`[orchestrator] Attempt ${attempt}/${MAX_ATTEMPTS} for ${name}`);
+      console.log(`[task] Attempt ${attempt}/${MAX_ATTEMPTS} for ${name}`);
 
-      let resultKey;
+      // Generate portrait
+      let portraitB64;
       try {
-        resultKey = await generatePortrait(objectKey, name, title, stylePrompt);
+        const imageFile = await toFile(Buffer.from(photoBuffer), 'photo.png', { type: 'image/png' });
+        const result = await openai.images.edit({
+          model: 'gpt-image-1',
+          image: imageFile,
+          prompt,
+          size: '1024x1024',
+          quality: 'low',
+        });
+        portraitB64 = result.data[0].b64_json;
+        console.log(`[task] Portrait generated on attempt ${attempt}`);
       } catch (err) {
-        console.error(`[orchestrator] generate-portrait failed on attempt ${attempt}: ${err.message || err}`);
-        if (attempt === MAX_ATTEMPTS) {
-          throw err;
-        }
+        console.error(`[task] Generation failed on attempt ${attempt}: ${err.message}`);
+        if (attempt === MAX_ATTEMPTS) throw err;
         continue;
       }
 
-      lastResultKey = resultKey;
+      // Upload result
+      const resultKey = `portraits/result-${crypto.randomUUID()}.png`;
+      const resultBuffer = Buffer.from(portraitB64, 'base64');
+      await uploadToStorage(resultKey, resultBuffer);
+      console.log(`[task] Uploaded ${resultKey} (${resultBuffer.length} bytes)`);
 
-      // On the final attempt, skip verification — return whatever we got
+      // On the final attempt, skip verification
       if (attempt === MAX_ATTEMPTS) {
-        console.log(`[orchestrator] Final attempt, skipping verification`);
+        console.log(`[task] Final attempt, skipping verification`);
         return resultKey;
       }
 
-      // Verify likeness inline (no subtask)
+      // Verify likeness inline
       try {
-        const portraitObj = await downloadFromStorage(resultKey);
-        const portraitB64 = portraitObj.data.toString('base64');
-
         const verification = await verifyLikeness(originalB64, portraitB64);
-
         if (verification.match) {
-          console.log(`[orchestrator] Likeness verified on attempt ${attempt}`);
+          console.log(`[task] Likeness verified on attempt ${attempt}`);
           return resultKey;
         }
-
-        console.log(`[orchestrator] Likeness failed on attempt ${attempt}, retrying...`);
+        console.log(`[task] Likeness failed on attempt ${attempt}, retrying...`);
         deleteFromStorage(resultKey);
       } catch (err) {
-        console.error(`[orchestrator] verification failed on attempt ${attempt}: ${err.message || err}`);
-        // Verification error — keep the portrait rather than retrying blindly
-        console.log(`[orchestrator] Returning portrait despite verification error`);
+        console.error(`[task] Verification error on attempt ${attempt}: ${err.message}`);
+        // Can't verify — return what we have
         return resultKey;
       }
     }
-
-    return lastResultKey;
   }
 );
 
