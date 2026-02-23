@@ -160,10 +160,17 @@ task(
         result = await generatePortrait(objectKey, name, title, stylePrompt);
       } catch (err) {
         console.error(`[orchestrator] Subtask failed on attempt ${attempt}: ${err.message || err}`);
+        // If we have a previous portrait, return it instead of failing
+        if (lastResultKey) {
+          console.log(`[orchestrator] Returning previous portrait: ${lastResultKey}`);
+          return lastResultKey;
+        }
         if (attempt === MAX_ATTEMPTS) throw err;
         continue;
       }
 
+      // Clean up the previous failed portrait now that we have a new one
+      if (lastResultKey) deleteFromStorage(lastResultKey);
       lastResultKey = result.resultKey;
 
       // On the final attempt, return regardless of verification
@@ -173,15 +180,14 @@ task(
       }
 
       if (result.match) {
-        console.log(`[orchestrator] Likeness verified on attempt ${attempt} (${result.passed}/5)`);
+        console.log(`[orchestrator] Likeness verified on attempt ${attempt} (${result.passed}/4)`);
         return result.resultKey;
       }
 
-      // Failed verification — delete the portrait and retry
-      console.log(`[orchestrator] Likeness failed on attempt ${attempt} (${result.passed}/5: ${result.reason}), retrying...`);
-      deleteFromStorage(result.resultKey);
+      console.log(`[orchestrator] Likeness failed on attempt ${attempt} (${result.passed}/4: ${result.reason}), retrying...`);
     }
 
+    // All attempts failed verification — return the last portrait anyway
     return lastResultKey;
   }
 );
