@@ -37,8 +37,7 @@ function deleteFromStorage(key) {
   }).catch(() => {});
 }
 
-// ── Verify likeness (plain function) ──
-// Compares original photo and generated portrait via GPT-4o-mini vision.
+// ── Verify likeness (plain function called inside subtask) ──
 async function verifyLikeness(originalB64, portraitB64) {
   const response = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -84,74 +83,99 @@ Set "match": true ONLY if at least 4 of 5 criteria pass.`,
   return result;
 }
 
-// ── Single task: generate + verify + retry, all in one process ──
-// Downloads photo once, then loops: generate portrait → verify likeness → retry if needed.
-// No subtasks — avoids worker spawn cascade and object storage 404s.
+// ── Subtask: generate-portrait ──
+// Downloads photo, generates portrait, verifies likeness, uploads result.
+// Returns { resultKey, match, passed, reason } so the orchestrator can decide.
+const generatePortrait = task(
+  { name: 'generate-portrait' },
+  async function generatePortrait(objectKey, name, title, stylePrompt) {
+    console.log(`[generate] Starting portrait for ${name}, fetching photo: ${objectKey}`);
+
+    // Download original photo
+    const obj = await render.experimental.storage.objects.get({
+      ownerId: OWNER_ID, region: REGION, key: objectKey,
+    });
+    const originalB64 = obj.data.toString('base64');
+    console.log(`[generate] Downloaded photo: ${obj.size} bytes`);
+
+    // Generate portrait
+    const prompt = `A stylized premium trading card portrait of ${name}, ${title}. ${stylePrompt}. Upper body portrait, facing the viewer.`;
+    const imageFile = await toFile(obj.data, 'photo.png', { type: 'image/png' });
+    console.log('[generate] Calling images.edit...');
+
+    const result = await openai.images.edit({
+      model: 'gpt-image-1',
+      image: imageFile,
+      prompt,
+      size: '1024x1024',
+      quality: 'low',
+    });
+    const portraitB64 = result.data[0].b64_json;
+    console.log('[generate] Portrait generated');
+
+    // Upload result to object storage
+    const resultKey = `portraits/result-${crypto.randomUUID()}.png`;
+    const resultBuffer = Buffer.from(portraitB64, 'base64');
+    await uploadToStorage(resultKey, resultBuffer);
+    console.log(`[generate] Uploaded ${resultKey} (${resultBuffer.length} bytes)`);
+
+    // Verify likeness (both images already in memory — no extra downloads)
+    let match = true;
+    let passed = 5;
+    let reason = 'verification skipped';
+    try {
+      const verification = await verifyLikeness(originalB64, portraitB64);
+      match = verification.match;
+      passed = verification.passed;
+      reason = verification.reason;
+    } catch (err) {
+      console.error(`[generate] Verification call failed: ${err.message}`);
+      // If verification fails, default to accepting the portrait
+    }
+
+    return { resultKey, match, passed, reason };
+  }
+);
+
+// ── Orchestrator: generate-verified-portrait ──
+// Calls generate-portrait subtask, retries if likeness fails. Never touches object storage.
 task(
   { name: 'generate-verified-portrait' },
   async function generateVerifiedPortrait(objectKey, name, title, stylePrompt) {
     const MAX_ATTEMPTS = 3;
-
-    // Download photo once, keep in memory for all attempts
-    console.log(`[task] Downloading photo: ${objectKey}`);
-    const obj = await render.experimental.storage.objects.get({
-      ownerId: OWNER_ID, region: REGION, key: objectKey,
-    });
-    const photoBuffer = obj.data;
-    const originalB64 = photoBuffer.toString('base64');
-    console.log(`[task] Downloaded photo: ${obj.size} bytes`);
-
-    const prompt = `A stylized premium trading card portrait of ${name}, ${title}. ${stylePrompt}. Upper body portrait, facing the viewer.`;
+    let lastResultKey = null;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      console.log(`[task] Attempt ${attempt}/${MAX_ATTEMPTS} for ${name}`);
+      console.log(`[orchestrator] Attempt ${attempt}/${MAX_ATTEMPTS} for ${name}`);
 
-      // Generate portrait
-      let portraitB64;
+      let result;
       try {
-        const imageFile = await toFile(Buffer.from(photoBuffer), 'photo.png', { type: 'image/png' });
-        const result = await openai.images.edit({
-          model: 'gpt-image-1',
-          image: imageFile,
-          prompt,
-          size: '1024x1024',
-          quality: 'low',
-        });
-        portraitB64 = result.data[0].b64_json;
-        console.log(`[task] Portrait generated on attempt ${attempt}`);
+        result = await generatePortrait(objectKey, name, title, stylePrompt);
       } catch (err) {
-        console.error(`[task] Generation failed on attempt ${attempt}: ${err.message}`);
+        console.error(`[orchestrator] Subtask failed on attempt ${attempt}: ${err.message || err}`);
         if (attempt === MAX_ATTEMPTS) throw err;
         continue;
       }
 
-      // Upload result
-      const resultKey = `portraits/result-${crypto.randomUUID()}.png`;
-      const resultBuffer = Buffer.from(portraitB64, 'base64');
-      await uploadToStorage(resultKey, resultBuffer);
-      console.log(`[task] Uploaded ${resultKey} (${resultBuffer.length} bytes)`);
+      lastResultKey = result.resultKey;
 
-      // On the final attempt, skip verification
+      // On the final attempt, return regardless of verification
       if (attempt === MAX_ATTEMPTS) {
-        console.log(`[task] Final attempt, skipping verification`);
-        return resultKey;
+        console.log(`[orchestrator] Final attempt, returning portrait (match=${result.match})`);
+        return result.resultKey;
       }
 
-      // Verify likeness inline
-      try {
-        const verification = await verifyLikeness(originalB64, portraitB64);
-        if (verification.match) {
-          console.log(`[task] Likeness verified on attempt ${attempt}`);
-          return resultKey;
-        }
-        console.log(`[task] Likeness failed on attempt ${attempt}, retrying...`);
-        deleteFromStorage(resultKey);
-      } catch (err) {
-        console.error(`[task] Verification error on attempt ${attempt}: ${err.message}`);
-        // Can't verify — return what we have
-        return resultKey;
+      if (result.match) {
+        console.log(`[orchestrator] Likeness verified on attempt ${attempt} (${result.passed}/5)`);
+        return result.resultKey;
       }
+
+      // Failed verification — delete the portrait and retry
+      console.log(`[orchestrator] Likeness failed on attempt ${attempt} (${result.passed}/5: ${result.reason}), retrying...`);
+      deleteFromStorage(result.resultKey);
     }
+
+    return lastResultKey;
   }
 );
 
