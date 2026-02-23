@@ -82,34 +82,23 @@ const generatePortrait = task(
   }
 );
 
-// ── Task 2: verify-likeness ──
-// Compares original photo and generated portrait via GPT-4o-mini vision
-const verifyLikeness = task(
-  { name: 'verify-likeness' },
-  async function verifyLikeness(originalKey, portraitKey) {
-    console.log(`[verify] Comparing ${originalKey} vs ${portraitKey}`);
-
-    const [originalObj, portraitObj] = await Promise.all([
-      downloadFromStorage(originalKey),
-      downloadFromStorage(portraitKey),
-    ]);
-
-    const originalB64 = originalObj.data.toString('base64');
-    const portraitB64 = portraitObj.data.toString('base64');
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a strict quality-control judge for AI-generated portraits. Your job is to REJECT portraits that don\'t look like the original person. Be critical — when in doubt, reject. Most AI portraits fail to preserve likeness, so "match": false should be your default unless the resemblance is clearly strong.',
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Image 1 is the original photo. Image 2 is a stylized portrait that should depict the same person.
+// ── Verify likeness (plain function, not a subtask) ──
+// Compares original photo and generated portrait via GPT-4o-mini vision.
+// Runs inline in the orchestrator to avoid subtask worker issues with object storage.
+async function verifyLikeness(originalB64, portraitB64) {
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: 'You are a strict quality-control judge for AI-generated portraits. Your job is to REJECT portraits that don\'t look like the original person. Be critical — when in doubt, reject. Most AI portraits fail to preserve likeness, so "match": false should be your default unless the resemblance is clearly strong.',
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: `Image 1 is the original photo. Image 2 is a stylized portrait that should depict the same person.
 
 Score each criterion pass/fail:
 1. FACE SHAPE: Does the portrait preserve the original face shape (round, oval, square, etc.)?
@@ -120,34 +109,38 @@ Score each criterion pass/fail:
 
 Respond with JSON: {"match": true/false, "passed": <number of criteria passed out of 5>, "reason": "which criteria failed and why"}
 Set "match": true ONLY if at least 4 of 5 criteria pass.`,
-            },
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/png;base64,${originalB64}` },
-            },
-            {
-              type: 'image_url',
-              image_url: { url: `data:image/png;base64,${portraitB64}` },
-            },
-          ],
-        },
-      ],
-      response_format: { type: 'json_object' },
-      max_tokens: 300,
-    });
+          },
+          {
+            type: 'image_url',
+            image_url: { url: `data:image/png;base64,${originalB64}` },
+          },
+          {
+            type: 'image_url',
+            image_url: { url: `data:image/png;base64,${portraitB64}` },
+          },
+        ],
+      },
+    ],
+    response_format: { type: 'json_object' },
+    max_tokens: 300,
+  });
 
-    const result = JSON.parse(response.choices[0].message.content);
-    console.log(`[verify] match=${result.match}, passed=${result.passed}/5, reason=${result.reason}`);
-    return result;
-  }
-);
+  const result = JSON.parse(response.choices[0].message.content);
+  console.log(`[verify] match=${result.match}, passed=${result.passed}/5, reason=${result.reason}`);
+  return result;
+}
 
-// ── Task 3: generate-verified-portrait (orchestrator) ──
+// ── Task 2: generate-verified-portrait (orchestrator) ──
 // Generates a portrait and verifies likeness, retrying up to 3 total attempts
 task(
   { name: 'generate-verified-portrait' },
   async function generateVerifiedPortrait(objectKey, name, title, stylePrompt) {
     const MAX_ATTEMPTS = 3;
+
+    // Download original photo once for verification comparisons
+    const originalObj = await downloadFromStorage(objectKey);
+    const originalB64 = originalObj.data.toString('base64');
+    console.log(`[orchestrator] Downloaded original photo: ${originalObj.size} bytes`);
 
     let lastResultKey = null;
 
@@ -160,7 +153,7 @@ task(
       } catch (err) {
         console.error(`[orchestrator] generate-portrait failed on attempt ${attempt}: ${err.message || err}`);
         if (attempt === MAX_ATTEMPTS) {
-          throw err; // no more retries, let the task fail
+          throw err;
         }
         continue;
       }
@@ -173,26 +166,28 @@ task(
         return resultKey;
       }
 
+      // Verify likeness inline (no subtask)
       try {
-        const verification = await verifyLikeness(objectKey, resultKey);
+        const portraitObj = await downloadFromStorage(resultKey);
+        const portraitB64 = portraitObj.data.toString('base64');
+
+        const verification = await verifyLikeness(originalB64, portraitB64);
 
         if (verification.match) {
           console.log(`[orchestrator] Likeness verified on attempt ${attempt}`);
           return resultKey;
         }
 
-        // Failed verification — delete the bad portrait and retry
         console.log(`[orchestrator] Likeness failed on attempt ${attempt}, retrying...`);
         deleteFromStorage(resultKey);
       } catch (err) {
-        console.error(`[orchestrator] verify-likeness failed on attempt ${attempt}: ${err.message || err}`);
-        // Verification error — keep the portrait and return it rather than retrying blindly
+        console.error(`[orchestrator] verification failed on attempt ${attempt}: ${err.message || err}`);
+        // Verification error — keep the portrait rather than retrying blindly
         console.log(`[orchestrator] Returning portrait despite verification error`);
         return resultKey;
       }
     }
 
-    // Should not reach here, but safety net
     return lastResultKey;
   }
 );
