@@ -1,9 +1,11 @@
 const { task, startTaskServer } = require('@renderinc/sdk/workflows');
+const { Render } = require('@renderinc/sdk');
 const crypto = require('crypto');
 const OpenAI = require('openai');
 const { toFile } = require('openai');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const render = new Render({ token: process.env.RENDER_API_KEY });
 
 const OWNER_ID = process.env.RENDER_OWNER_ID || '';
 const REGION = 'oregon';
@@ -28,38 +30,27 @@ async function uploadToStorage(key, buffer) {
   });
 }
 
-// ── Helper: download from object storage via presigned URL ──
+// ── Helper: download from object storage ──
 async function downloadFromStorage(key) {
-  const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${key}`, {
-    method: 'GET',
-    headers: { 'Authorization': `Bearer ${process.env.RENDER_API_KEY}` },
+  const obj = await render.experimental.storage.objects.get({
+    ownerId: OWNER_ID,
+    region: REGION,
+    key,
   });
-  if (!presignResp.ok) {
-    const body = await presignResp.text().catch(() => '');
-    throw new Error(`Failed to get download URL for ${key}: ${presignResp.status} ${body}`);
-  }
-  const { url: downloadUrl } = await presignResp.json();
-
-  const dataResp = await fetch(downloadUrl);
-  if (!dataResp.ok) {
-    throw new Error(`Failed to download ${key}: ${dataResp.status}`);
-  }
-  const arrayBuf = await dataResp.arrayBuffer();
-  return { data: Buffer.from(arrayBuf), size: arrayBuf.byteLength };
+  return obj;
 }
 
 // ── Helper: delete from object storage (fire-and-forget) ──
 function deleteFromStorage(key) {
-  fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${key}`, {
-    method: 'DELETE',
-    headers: { 'Authorization': `Bearer ${process.env.RENDER_API_KEY}` },
+  render.experimental.storage.objects.delete({
+    ownerId: OWNER_ID, region: REGION, key,
   }).catch(() => {});
 }
 
 // ── Task 1: generate-portrait ──
 // Downloads photo, generates stylized portrait via gpt-image-1, uploads result
 const generatePortrait = task(
-  { name: 'generate-portrait', retry: { maxRetries: 1, waitDurationMs: 2000 } },
+  { name: 'generate-portrait' },
   async function generatePortrait(objectKey, name, title, stylePrompt) {
     console.log(`[generate] Starting portrait for ${name}, fetching photo: ${objectKey}`);
 
