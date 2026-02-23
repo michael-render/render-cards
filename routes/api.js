@@ -354,6 +354,24 @@ router.get('/cards/:id/image', (req, res) => {
   res.sendFile(filePath);
 });
 
+// Delete a card
+router.delete('/cards/:id', async (req, res) => {
+  try {
+    const result = await pool.query('DELETE FROM cards WHERE id = $1 RETURNING id', [req.params.id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Card not found' });
+    }
+    const filePath = path.join(storagePath, `${req.params.id}.png`);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete card error:', err.message);
+    res.status(500).json({ error: 'Failed to delete card' });
+  }
+});
+
 // Get single card metadata
 router.get('/cards/:id', async (req, res) => {
   try {
