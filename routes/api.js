@@ -6,30 +6,6 @@ const { pool } = require('../db');
 const router = express.Router();
 
 const storagePath = process.env.CARD_STORAGE_PATH || path.join(__dirname, '..', 'card-images');
-const OWNER_ID = process.env.RENDER_OWNER_ID || '';
-const REGION = 'oregon';
-
-async function downloadFromStorage(objectKey, retries = 3) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${objectKey}`, {
-        headers: { 'Authorization': `Bearer ${process.env.RENDER_API_KEY}` },
-      });
-      if (!presignResp.ok) {
-        const body = await presignResp.text().catch(() => '');
-        throw new Error(`Presign failed: ${presignResp.status} ${body}`);
-      }
-      const { url: downloadUrl } = await presignResp.json();
-      const resp = await fetch(downloadUrl);
-      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
-      return Buffer.from(await resp.arrayBuffer());
-    } catch (err) {
-      console.error(`[download] Attempt ${attempt}/${retries} for ${objectKey}: ${err.message}`);
-      if (attempt === retries) throw err;
-      await new Promise(r => setTimeout(r, 1000 * attempt));
-    }
-  }
-}
 
 function getOpenAI() {
   if (!process.env.OPENAI_API_KEY) return null;
@@ -40,7 +16,7 @@ function getOpenAI() {
 function getRender() {
   if (!process.env.RENDER_API_KEY) return null;
   const { Render } = require('@renderinc/sdk');
-  return new Render({ token: process.env.RENDER_API_KEY });
+  return new Render();
 }
 
 // ── Portrait Session Store (in-memory, 15-min TTL) ──
@@ -188,30 +164,17 @@ router.post('/enhance-photo-multi', async (req, res) => {
   }
 
   try {
-    // Upload photo to object storage so workflow tasks can access it
+    // Upload photo to object storage via SDK
     const objectKey = `portraits/${crypto.randomUUID()}.png`;
     const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Buffer.from(base64Data, 'base64');
 
-    // Upload to object storage via presigned URL (bypassing SDK to avoid Content-Type signature mismatch)
     console.log(`[portraits] Uploading photo to object storage: ${objectKey} (${imageBuffer.length} bytes)`);
-    const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${objectKey}`, {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ sizeBytes: imageBuffer.length }),
+    await render.experimental.storage.objects.put({
+      key: objectKey,
+      data: imageBuffer,
+      contentType: 'image/png',
     });
-    if (!presignResp.ok) throw new Error(`Failed to get upload URL: ${presignResp.status}`);
-    const { url: uploadUrl } = await presignResp.json();
-
-    const uploadResp = await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Length': imageBuffer.length.toString() },
-      body: imageBuffer,
-    });
-    if (!uploadResp.ok) throw new Error(`Upload failed: ${uploadResp.status} ${uploadResp.statusText}`);
     console.log(`[portraits] Upload complete`);
 
     // Create session in pending state
@@ -221,67 +184,62 @@ router.post('/enhance-photo-multi', async (req, res) => {
       createdAt: Date.now(),
     });
 
-    // Start 3 workflow tasks, passing the object key (not the photo data)
-    const headers = {
-      'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
-      'Content-Type': 'application/json',
-    };
-
-    const startPromises = PORTRAIT_STYLES.map((style) =>
-      fetch('https://api.render.com/v1/task-runs', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          task: 'render-cards-workflow/generate-verified-portrait',
-          input: [objectKey, name, title, style],
-        }),
-      }).then(r => r.json())
+    // Start 3 workflow tasks via SDK
+    const runs = await Promise.all(
+      PORTRAIT_STYLES.map(style =>
+        render.workflows.startTask('render-cards-workflow/generate-verified-portrait', [objectKey, name, title, style])
+      )
     );
-
-    const taskRuns = await Promise.all(startPromises);
-    const taskRunIds = taskRuns.map(r => r.id);
+    const taskRunIds = runs.map(r => r.taskRunId);
     console.log(`[portraits] Started 3 tasks: ${taskRunIds.join(', ')}`);
 
-    // Wait for all 3 in background, download results from object storage
-    Promise.all(
-      taskRunIds.map(id => render.workflows.waitForTask(id))
-    ).then(async (results) => {
-      console.log(`[portraits] All 3 completed for session ${sessionId}`);
-      const session = portraitSessions.get(sessionId);
-      if (!session) return;
-
-      // Results are object storage keys — download and convert to data URLs
-      const resultKeys = results.map(r => r.results?.[0] || r.results);
-      console.log(`[portraits] Downloading results: ${resultKeys.join(', ')}`);
-
-      const images = await Promise.all(resultKeys.map(async (key) => {
-        try {
-          const buf = await downloadFromStorage(key);
-          return `data:image/png;base64,${buf.toString('base64')}`;
-        } catch (err) {
-          console.error(`[portraits] Failed to download result ${key}: ${err.message}`);
-          return null;
+    // Wait for all 3 in background via SSE event stream
+    (async () => {
+      try {
+        const completed = new Map();
+        for await (const event of render.workflows.taskRunEvents(taskRunIds)) {
+          completed.set(event.id, event);
+          if (completed.size === taskRunIds.length) break;
         }
-      }));
 
-      session.status = 'ready';
-      session.images = images;
+        console.log(`[portraits] All 3 completed for session ${sessionId}`);
+        const session = portraitSessions.get(sessionId);
+        if (!session) return;
 
-      // Clean up all objects (source photo + result portraits)
-      const keysToDelete = [objectKey, ...resultKeys];
-      for (const key of keysToDelete) {
-        render.experimental.storage.objects.delete({
-          ownerId: OWNER_ID, region: REGION, key,
-        }).catch(() => {});
+        // Results are object storage keys — download via SDK
+        const resultKeys = taskRunIds.map(id => {
+          const r = completed.get(id);
+          return r.results?.[0] || r.results;
+        });
+        console.log(`[portraits] Downloading results: ${resultKeys.join(', ')}`);
+
+        const images = await Promise.all(resultKeys.map(async (key) => {
+          try {
+            const obj = await render.experimental.storage.objects.get({ key });
+            return `data:image/png;base64,${obj.data.toString('base64')}`;
+          } catch (err) {
+            console.error(`[portraits] Failed to download result ${key}: ${err.message}`);
+            return null;
+          }
+        }));
+
+        session.status = 'ready';
+        session.images = images;
+
+        // Clean up all objects (source photo + result portraits)
+        const keysToDelete = [objectKey, ...resultKeys];
+        for (const key of keysToDelete) {
+          render.experimental.storage.objects.delete({ key }).catch(() => {});
+        }
+      } catch (err) {
+        console.error(`[portraits] Error: ${err.message}`);
+        const session = portraitSessions.get(sessionId);
+        if (session) {
+          session.status = 'failed';
+          session.error = err.message;
+        }
       }
-    }).catch((err) => {
-      console.error(`[portraits] Error: ${err.message}`);
-      const session = portraitSessions.get(sessionId);
-      if (session) {
-        session.status = 'failed';
-        session.error = err.message;
-      }
-    });
+    })();
 
     res.json({ sessionId });
   } catch (err) {

@@ -5,59 +5,12 @@ const OpenAI = require('openai');
 const { toFile } = require('openai');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const render = new Render({ token: process.env.RENDER_API_KEY });
-
-const OWNER_ID = process.env.RENDER_OWNER_ID || '';
-const REGION = 'oregon';
-
-// ── Helper: upload a buffer to object storage via presigned URL ──
-async function uploadToStorage(key, buffer) {
-  const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${key}`, {
-    method: 'PUT',
-    headers: {
-      'Authorization': `Bearer ${process.env.RENDER_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ sizeBytes: buffer.length }),
-  });
-  if (!presignResp.ok) throw new Error(`Failed to get upload URL: ${presignResp.status}`);
-  const { url: uploadUrl } = await presignResp.json();
-
-  await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: { 'Content-Length': buffer.length.toString() },
-    body: buffer,
-  });
-}
-
-// ── Helper: download from object storage with retries ──
-async function downloadFromStorage(objectKey, retries = 3) {
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${objectKey}`, {
-        headers: { 'Authorization': `Bearer ${process.env.RENDER_API_KEY}` },
-      });
-      if (!presignResp.ok) {
-        const body = await presignResp.text().catch(() => '');
-        throw new Error(`Presign failed: ${presignResp.status} ${body}`);
-      }
-      const { url: downloadUrl } = await presignResp.json();
-      const resp = await fetch(downloadUrl);
-      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
-      return Buffer.from(await resp.arrayBuffer());
-    } catch (err) {
-      console.error(`[download] Attempt ${attempt}/${retries} for ${objectKey}: ${err.message}`);
-      if (attempt === retries) throw err;
-      await new Promise(r => setTimeout(r, 1000 * attempt));
-    }
-  }
-}
+const render = new Render();
+const storage = render.experimental.storage.objects;
 
 // ── Helper: delete from object storage (fire-and-forget) ──
 function deleteFromStorage(key) {
-  render.experimental.storage.objects.delete({
-    ownerId: OWNER_ID, region: REGION, key,
-  }).catch(() => {});
+  storage.delete({ key }).catch(() => {});
 }
 
 // ── Verify likeness (plain function called inside subtask) ──
@@ -113,8 +66,9 @@ const generatePortrait = task(
   async function generatePortrait(objectKey, name, title, stylePrompt) {
     console.log(`[generate] Starting portrait for ${name}, fetching photo: ${objectKey}`);
 
-    // Download original photo with retries
-    const photoBuffer = await downloadFromStorage(objectKey);
+    // Download original photo via SDK (automatic retries in v0.4.0)
+    const obj = await storage.get({ key: objectKey });
+    const photoBuffer = obj.data;
     const originalB64 = photoBuffer.toString('base64');
     console.log(`[generate] Downloaded photo: ${photoBuffer.length} bytes`);
 
@@ -133,10 +87,10 @@ const generatePortrait = task(
     const portraitB64 = result.data[0].b64_json;
     console.log('[generate] Portrait generated');
 
-    // Upload result to object storage
+    // Upload result to object storage via SDK
     const resultKey = `portraits/result-${crypto.randomUUID()}.png`;
     const resultBuffer = Buffer.from(portraitB64, 'base64');
-    await uploadToStorage(resultKey, resultBuffer);
+    await storage.put({ key: resultKey, data: resultBuffer, contentType: 'image/png' });
     console.log(`[generate] Uploaded ${resultKey} (${resultBuffer.length} bytes)`);
 
     // Verify likeness (both images already in memory — no extra downloads)
