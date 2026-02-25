@@ -195,24 +195,17 @@ router.post('/enhance-photo-multi', async (req, res) => {
     const taskRunIds = runs.map(r => r.taskRunId);
     console.log(`[portraits] Started 3 tasks: ${taskRunIds.join(', ')}`);
 
-    // Wait for all 3 in background via SSE event stream
+    // Wait for all 3 in background, each via its own SSE stream
     (async () => {
       try {
-        const completed = new Map();
-        for await (const event of render.workflows.taskRunEvents(taskRunIds)) {
-          completed.set(event.id, event);
-          if (completed.size === taskRunIds.length) break;
-        }
+        const results = await Promise.all(runs.map(r => r.get()));
 
         console.log(`[portraits] All 3 completed for session ${sessionId}`);
         const session = portraitSessions.get(sessionId);
         if (!session) return;
 
         // Results are object storage keys — download via SDK
-        const resultKeys = taskRunIds.map(id => {
-          const r = completed.get(id);
-          return r.results?.[0] || r.results;
-        });
+        const resultKeys = results.map(r => r.results?.[0] || r.results);
         console.log(`[portraits] Downloading results: ${resultKeys.join(', ')}`);
 
         const images = await Promise.all(resultKeys.map(async (key) => {
