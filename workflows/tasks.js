@@ -5,7 +5,10 @@ const OpenAI = require('openai');
 const { toFile } = require('openai');
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-const render = new Render();
+const render = new Render({
+  ownerId: process.env.RENDER_OWNER_ID,
+  region: process.env.RENDER_REGION || 'oregon',
+});
 const storage = render.experimental.storage.objects;
 
 // ── Helper: delete from object storage (fire-and-forget) ──

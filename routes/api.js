@@ -16,7 +16,10 @@ function getOpenAI() {
 function getRender() {
   if (!process.env.RENDER_API_KEY) return null;
   const { Render } = require('@renderinc/sdk');
-  return new Render();
+  return new Render({
+    ownerId: process.env.RENDER_OWNER_ID,
+    region: process.env.RENDER_REGION || 'oregon',
+  });
 }
 
 // ── Portrait Session Store (in-memory, 15-min TTL) ──
