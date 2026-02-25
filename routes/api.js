@@ -176,7 +176,6 @@ router.post('/enhance-photo-multi', async (req, res) => {
     await render.experimental.storage.objects.put({
       key: objectKey,
       data: imageBuffer,
-      contentType: 'image/png',
     });
     console.log(`[portraits] Upload complete`);
 

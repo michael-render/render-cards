@@ -93,7 +93,7 @@ const generatePortrait = task(
     // Upload result to object storage via SDK
     const resultKey = `portraits/result-${crypto.randomUUID()}.png`;
     const resultBuffer = Buffer.from(portraitB64, 'base64');
-    await storage.put({ key: resultKey, data: resultBuffer, contentType: 'image/png' });
+    await storage.put({ key: resultKey, data: resultBuffer });
     console.log(`[generate] Uploaded ${resultKey} (${resultBuffer.length} bytes)`);
 
     // Verify likeness (both images already in memory — no extra downloads)
