@@ -6,6 +6,30 @@ const { pool } = require('../db');
 const router = express.Router();
 
 const storagePath = process.env.CARD_STORAGE_PATH || path.join(__dirname, '..', 'card-images');
+const OWNER_ID = process.env.RENDER_OWNER_ID || '';
+const REGION = 'oregon';
+
+async function downloadFromStorage(objectKey, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${objectKey}`, {
+        headers: { 'Authorization': `Bearer ${process.env.RENDER_API_KEY}` },
+      });
+      if (!presignResp.ok) {
+        const body = await presignResp.text().catch(() => '');
+        throw new Error(`Presign failed: ${presignResp.status} ${body}`);
+      }
+      const { url: downloadUrl } = await presignResp.json();
+      const resp = await fetch(downloadUrl);
+      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+      return Buffer.from(await resp.arrayBuffer());
+    } catch (err) {
+      console.error(`[download] Attempt ${attempt}/${retries} for ${objectKey}: ${err.message}`);
+      if (attempt === retries) throw err;
+      await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
+}
 
 function getOpenAI() {
   if (!process.env.OPENAI_API_KEY) return null;
@@ -155,9 +179,6 @@ const PORTRAIT_STYLES = [
   'Bold collectible card style with deep shadows, golden accents, sharp dramatic lighting',
 ];
 
-const OWNER_ID = process.env.RENDER_OWNER_ID || '';
-const REGION = 'oregon';
-
 router.post('/enhance-photo-multi', async (req, res) => {
   const { photo, name, title } = req.body;
   const render = getRender();
@@ -235,10 +256,8 @@ router.post('/enhance-photo-multi', async (req, res) => {
 
       const images = await Promise.all(resultKeys.map(async (key) => {
         try {
-          const obj = await render.experimental.storage.objects.get({
-            ownerId: OWNER_ID, region: REGION, key,
-          });
-          return `data:image/png;base64,${obj.data.toString('base64')}`;
+          const buf = await downloadFromStorage(key);
+          return `data:image/png;base64,${buf.toString('base64')}`;
         } catch (err) {
           console.error(`[portraits] Failed to download result ${key}: ${err.message}`);
           return null;

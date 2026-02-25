@@ -30,6 +30,29 @@ async function uploadToStorage(key, buffer) {
   });
 }
 
+// ── Helper: download from object storage with retries ──
+async function downloadFromStorage(objectKey, retries = 3) {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${objectKey}`, {
+        headers: { 'Authorization': `Bearer ${process.env.RENDER_API_KEY}` },
+      });
+      if (!presignResp.ok) {
+        const body = await presignResp.text().catch(() => '');
+        throw new Error(`Presign failed: ${presignResp.status} ${body}`);
+      }
+      const { url: downloadUrl } = await presignResp.json();
+      const resp = await fetch(downloadUrl);
+      if (!resp.ok) throw new Error(`Download failed: ${resp.status}`);
+      return Buffer.from(await resp.arrayBuffer());
+    } catch (err) {
+      console.error(`[download] Attempt ${attempt}/${retries} for ${objectKey}: ${err.message}`);
+      if (attempt === retries) throw err;
+      await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
+}
+
 // ── Helper: delete from object storage (fire-and-forget) ──
 function deleteFromStorage(key) {
   render.experimental.storage.objects.delete({
@@ -90,18 +113,8 @@ const generatePortrait = task(
   async function generatePortrait(objectKey, name, title, stylePrompt) {
     console.log(`[generate] Starting portrait for ${name}, fetching photo: ${objectKey}`);
 
-    // Download original photo (direct fetch — SDK objects.get() fails in subtask workers)
-    const presignResp = await fetch(`https://api.render.com/v1/objects/${OWNER_ID}/${REGION}/${objectKey}`, {
-      headers: { 'Authorization': `Bearer ${process.env.RENDER_API_KEY}` },
-    });
-    if (!presignResp.ok) {
-      const body = await presignResp.text().catch(() => '');
-      throw new Error(`Failed to get download URL for ${objectKey}: ${presignResp.status} ${body}`);
-    }
-    const { url: downloadUrl } = await presignResp.json();
-    const photoResp = await fetch(downloadUrl);
-    if (!photoResp.ok) throw new Error(`Download failed: ${photoResp.status}`);
-    const photoBuffer = Buffer.from(await photoResp.arrayBuffer());
+    // Download original photo with retries
+    const photoBuffer = await downloadFromStorage(objectKey);
     const originalB64 = photoBuffer.toString('base64');
     console.log(`[generate] Downloaded photo: ${photoBuffer.length} bytes`);
 

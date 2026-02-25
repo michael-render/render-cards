@@ -96,6 +96,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (resp.ok) {
         status.textContent = 'Saved to gallery';
         status.classList.add('visible');
+        sessionStorage.removeItem('formData');
+        sessionStorage.removeItem('cardData');
       }
     } catch (err) {
       console.warn('Gallery save failed (non-blocking):', err.message);
