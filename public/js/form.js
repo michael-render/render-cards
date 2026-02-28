@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', () => {
         responses,
         funTitle: cardContent.funTitle,
         tagline: cardContent.tagline,
+        resolvedEmoji: cardContent.resolvedEmoji,
         stats: cardContent.stats,
       };
 

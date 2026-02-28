@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       data.funTitle = content.funTitle;
       data.tagline = content.tagline;
+      data.resolvedEmoji = content.resolvedEmoji;
       data.stats = content.stats;
 
       sessionStorage.setItem('cardData', JSON.stringify(data));
@@ -106,7 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Name + emoji
     document.getElementById('card-name').textContent = d.name || 'NAME';
-    document.getElementById('card-emoji').textContent = d.responses?.emoji || '';
+    document.getElementById('card-emoji').textContent = d.resolvedEmoji || d.responses?.emoji || '';
 
     // Fun title + role
     document.getElementById('card-fun-title').textContent = d.funTitle || 'Mystery Human';

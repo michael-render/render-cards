@@ -49,6 +49,7 @@ router.post('/generate-card', async (req, res) => {
     return res.json({
       funTitle: funTitles[Math.floor(Math.random() * funTitles.length)],
       tagline: taglines[Math.floor(Math.random() * taglines.length)],
+      resolvedEmoji: emoji || '🤙',
       stats: shuffled.slice(0, 3).map(label => ({
         label,
         value: Math.floor(Math.random() * 15) + 85
@@ -65,6 +66,7 @@ router.post('/generate-card', async (req, res) => {
 {
   "funTitle": "A funny/creative 2-4 word title (NOT their real role). Make it playful and specific to them.",
   "tagline": "A witty one-liner (max 15 words) that captures their personality based on their responses.",
+  "resolvedEmoji": "Convert their favorite emoji text (e.g. ':fire:', ':cat-nodding:', ':rocket:') into the closest single Unicode emoji character. If already a Unicode emoji, keep it. If you can't resolve it, use 🤙.",
   "stats": [{"label": "1-2 word label", "value": number}, ...] (exactly 3 stats, values 80-99, make them fun and relevant to their answers)
 }
 Be creative, funny, and specific to the person. Avoid generic corporate speak.`
@@ -88,6 +90,7 @@ Motivation: ${motivation || 'not provided'}`
     res.json({
       funTitle: parsed.funTitle || 'Mystery Human',
       tagline: parsed.tagline || 'Living the dream.',
+      resolvedEmoji: parsed.resolvedEmoji || emoji || '🤙',
       stats: Array.isArray(parsed.stats) ? parsed.stats.slice(0, 3) : [],
     });
   } catch (err) {
