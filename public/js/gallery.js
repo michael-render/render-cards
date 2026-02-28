@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         <img src="/api/cards/${card.id}/image" alt="${card.name}" loading="lazy">
         <div class="gallery-card-info">
           <div class="gallery-card-name">${card.name}</div>
-          <div class="gallery-card-title">${card.title}</div>
+          <div class="gallery-card-title">${card.fun_title || card.title}</div>
         </div>
       `;
       el.addEventListener('click', () => openModal(card.id, card.name));
@@ -39,7 +39,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const imageUrl = `/api/cards/${id}/image`;
     modalImage.src = imageUrl;
     modalDownload.href = imageUrl;
-    modalDownload.download = `${name.replace(/\s+/g, '_')}_render_card.png`;
+    modalDownload.download = `${name.replace(/\s+/g, '_')}_rendervous.png`;
     modal.classList.add('active');
   }
 

@@ -1,4 +1,14 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Raleway:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --teal: #06D6A0;
+  --teal-dim: #04a87d;
+  --ocean-dark: #0B1622;
+  --ocean-mid: #0F2033;
+  --ocean-deep: #071018;
+  --text-primary: #E8F4F0;
+  --text-secondary: #8BA5A0;
+}
 
 * {
   margin: 0;
@@ -7,10 +17,10 @@
 }
 
 body {
-  background: linear-gradient(170deg, #0a0a0f 0%, #12121a 50%, #0e0e16 100%);
+  background: linear-gradient(175deg, var(--ocean-mid) 0%, var(--ocean-dark) 50%, var(--ocean-deep) 100%);
   min-height: 100vh;
   font-family: 'Raleway', sans-serif;
-  color: #e0d6c2;
+  color: var(--text-primary);
 }
 
 /* ── Header ── */
@@ -25,17 +35,14 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 3px;
-  background: linear-gradient(180deg, #F5E6B8 0%, #D4AF37 50%, #8B6914 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--teal);
   margin-bottom: 8px;
 }
 
 .gallery-header p {
   font-size: 13px;
   font-weight: 300;
-  color: #8a7f6a;
+  color: var(--text-secondary);
   letter-spacing: 1px;
 }
 
@@ -51,17 +58,17 @@ body {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 2px;
-  color: #D4AF37;
+  color: var(--teal);
   text-decoration: none;
-  border: 1px solid rgba(212, 175, 55, 0.3);
+  border: 1px solid rgba(6, 214, 160, 0.3);
   padding: 6px 18px;
   border-radius: 4px;
   transition: all 0.2s;
 }
 
 .gallery-nav a:hover {
-  background: rgba(212, 175, 55, 0.1);
-  border-color: rgba(212, 175, 55, 0.5);
+  background: rgba(6, 214, 160, 0.08);
+  border-color: rgba(6, 214, 160, 0.5);
 }
 
 /* ── Grid ── */
@@ -75,8 +82,8 @@ body {
 }
 
 .gallery-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(212, 175, 55, 0.12);
+  background: rgba(6, 214, 160, 0.03);
+  border: 1px solid rgba(6, 214, 160, 0.12);
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.25s ease;
@@ -99,14 +106,14 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #D4AF37;
+  color: var(--teal);
   margin-bottom: 2px;
 }
 
 .gallery-card-title {
   font-size: 11px;
   font-weight: 400;
-  color: #8a7f6a;
+  color: var(--text-secondary);
   letter-spacing: 1px;
   text-transform: uppercase;
 }
@@ -121,17 +128,17 @@ body {
   width: calc(100% - 28px);
   margin: 0 14px 12px;
   padding: 8px 0;
-  border: 2px solid #c0392b;
+  border: 2px solid #FF6B6B;
   border-radius: 6px;
   background: transparent;
-  color: #c0392b;
+  color: #FF6B6B;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .delete-btn:hover {
-  background: rgba(192, 57, 43, 0.15);
-  box-shadow: 0 0 12px rgba(192, 57, 43, 0.15);
+  background: rgba(255, 107, 107, 0.12);
+  box-shadow: 0 0 12px rgba(255, 107, 107, 0.15);
 }
 
 .delete-btn:disabled {
@@ -143,7 +150,7 @@ body {
 .gallery-empty {
   text-align: center;
   padding: 80px 20px;
-  color: #5a5548;
+  color: var(--text-secondary);
   font-size: 15px;
   letter-spacing: 1px;
 }

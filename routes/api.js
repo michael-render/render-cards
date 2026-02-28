@@ -1,5 +1,4 @@
 const express = require('express');
-const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const { pool } = require('../db');
@@ -13,26 +12,6 @@ function getOpenAI() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
-function getRender() {
-  if (!process.env.RENDER_API_KEY) return null;
-  const { Render } = require('@renderinc/sdk');
-  return new Render({
-    ownerId: process.env.RENDER_OWNER_ID,
-    region: process.env.RENDER_REGION || 'oregon',
-  });
-}
-
-// ── Portrait Session Store (in-memory, 15-min TTL) ──
-const portraitSessions = new Map();
-const SESSION_TTL = 15 * 60 * 1000;
-
-setInterval(() => {
-  const now = Date.now();
-  for (const [id, session] of portraitSessions) {
-    if (now - session.createdAt > SESSION_TTL) portraitSessions.delete(id);
-  }
-}, 60 * 1000);
-
 // Health check — verifies DB is reachable before Render routes traffic
 router.get('/health', async (req, res) => {
   try {
@@ -43,23 +22,38 @@ router.get('/health', async (req, res) => {
   }
 });
 
-// Generate stats via GPT or fallback to random
-router.post('/generate-stats', async (req, res) => {
-  const { name, title, skills } = req.body;
+// Generate card content (fun title, tagline, stats) from prompt responses
+router.post('/generate-card', async (req, res) => {
+  const { name, role, hobby, unpopularOpinion, workHack, emoji, desertIsland, superpower, motivation } = req.body;
   const openai = getOpenAI();
 
   if (!openai) {
-    const labels = [
-      'Leadership', 'Creativity', 'Execution', 'Strategy', 'Impact',
-      'Innovation', 'Teamwork', 'Vision', 'Drive', 'Expertise',
-      'Communication', 'Problem Solving', 'Adaptability', 'Focus'
+    // Fallback: random fun content
+    const funTitles = [
+      'Chaos Coordinator', 'Vibe Architect', 'Snack Strategist',
+      'Meeting Survivor', 'Slack Ninja', 'Deploy Button Masher',
+      'Bug Whisperer', 'Coffee-Powered Engine', 'Keyboard Warrior',
     ];
-    const shuffled = labels.sort(() => Math.random() - 0.5);
-    const stats = shuffled.slice(0, 3).map(label => ({
-      label,
-      value: Math.floor(Math.random() * 10) + 90
-    }));
-    return res.json({ stats });
+    const taglines = [
+      'Bringing the energy since day one.',
+      'Will debug for snacks.',
+      'Probably thinking about lunch.',
+      'Living proof that caffeine works.',
+    ];
+    const statLabels = [
+      'Vibes', 'Hustle', 'Snack Game', 'Emoji Fluency', 'Hot Takes',
+      'Island Readiness', 'Chill Factor', 'Team Spirit', 'Curiosity',
+      'Wit', 'Boldness', 'Focus', 'Creativity', 'Resilience',
+    ];
+    const shuffled = statLabels.sort(() => Math.random() - 0.5);
+    return res.json({
+      funTitle: funTitles[Math.floor(Math.random() * funTitles.length)],
+      tagline: taglines[Math.floor(Math.random() * taglines.length)],
+      stats: shuffled.slice(0, 3).map(label => ({
+        label,
+        value: Math.floor(Math.random() * 15) + 85
+      })),
+    });
   }
 
   try {
@@ -67,209 +61,39 @@ router.post('/generate-stats', async (req, res) => {
       model: 'gpt-4o-mini',
       messages: [{
         role: 'system',
-        content: 'You generate trading card stats. Return exactly 3 stats as JSON array: [{"label": "short label", "value": number}]. Labels should be 1-2 words, values 85-99. Make them relevant to the person\'s role.'
+        content: `You create fun trading card content for a company offsite. Return JSON with exactly these fields:
+{
+  "funTitle": "A funny/creative 2-4 word title (NOT their real role). Make it playful and specific to them.",
+  "tagline": "A witty one-liner (max 15 words) that captures their personality based on their responses.",
+  "stats": [{"label": "1-2 word label", "value": number}, ...] (exactly 3 stats, values 80-99, make them fun and relevant to their answers)
+}
+Be creative, funny, and specific to the person. Avoid generic corporate speak.`
       }, {
         role: 'user',
-        content: `Generate 3 trading card stats for ${name}, ${title}. Their skills include: ${skills.join(', ')}.`
+        content: `Generate trading card content for:
+Name: ${name}
+Role: ${role}
+Hobby: ${hobby || 'not provided'}
+Unpopular Opinion: ${unpopularOpinion || 'not provided'}
+Work Hack: ${workHack || 'not provided'}
+Favorite Emoji: ${emoji || 'not provided'}
+Desert Island Items: ${desertIsland || 'not provided'}
+Mundane Superpower: ${superpower || 'not provided'}
+Motivation: ${motivation || 'not provided'}`
       }],
       response_format: { type: 'json_object' }
     });
 
     const parsed = JSON.parse(completion.choices[0].message.content);
-    const stats = parsed.stats || parsed;
-    res.json({ stats: Array.isArray(stats) ? stats.slice(0, 3) : [] });
-  } catch (err) {
-    console.error('Stats generation error:', err.message);
-    res.status(500).json({ error: 'Failed to generate stats' });
-  }
-});
-
-// Enhance uploaded photo: gpt-image-1 stylized portrait (photo → portrait directly)
-router.post('/enhance-photo', async (req, res) => {
-  const { photo, name, title } = req.body;
-  const openai = getOpenAI();
-
-  if (!openai || !photo) {
-    return res.json({ image: null });
-  }
-
-  try {
-    const prompt = `A stylized premium trading card portrait of ${name}, ${title}. Dramatic collectible card style with rich gold and dark tones, cinematic rim lighting, intense atmosphere. Upper body portrait, facing the viewer.`;
-
-    // Convert data URL to File object for the SDK
-    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-    const { toFile } = require('openai');
-    const imageFile = await toFile(imageBuffer, 'photo.png', { type: 'image/png' });
-
-    const result = await openai.images.edit({
-      model: 'gpt-image-1',
-      image: imageFile,
-      prompt,
-      size: '1024x1024',
-      quality: 'low',
+    res.json({
+      funTitle: parsed.funTitle || 'Mystery Human',
+      tagline: parsed.tagline || 'Living the dream.',
+      stats: Array.isArray(parsed.stats) ? parsed.stats.slice(0, 3) : [],
     });
-
-    const dataUrl = `data:image/png;base64,${result.data[0].b64_json}`;
-    res.json({ image: dataUrl });
   } catch (err) {
-    console.error('Photo enhancement error:', err.message);
-    res.json({ image: null });
+    console.error('Card generation error:', err.message);
+    res.status(500).json({ error: 'Failed to generate card content' });
   }
-});
-
-// Generate AI headshot via DALL-E
-router.post('/generate-image', async (req, res) => {
-  const { description } = req.body;
-  const openai = getOpenAI();
-
-  if (!openai) {
-    return res.json({ image: null, message: 'AI not available. Please upload a photo instead.' });
-  }
-
-  try {
-    const response = await openai.images.generate({
-      model: 'dall-e-3',
-      prompt: `Professional corporate headshot portrait of ${description}. Clean background, studio lighting, business attire, photorealistic style. Suitable for a premium trading card.`,
-      n: 1,
-      size: '1024x1024',
-      quality: 'standard'
-    });
-
-    // Fetch the image and convert to base64 data URL to avoid client-side CORS issues
-    const imageUrl = response.data[0].url;
-    const imgResp = await fetch(imageUrl);
-    const arrBuf = await imgResp.arrayBuffer();
-    const base64 = Buffer.from(arrBuf).toString('base64');
-    const dataUrl = `data:image/png;base64,${base64}`;
-
-    res.json({ image: dataUrl });
-  } catch (err) {
-    console.error('Image generation error:', err.message);
-    res.status(500).json({ error: 'Failed to generate image' });
-  }
-});
-
-// ── Multi-Portrait via Render Workflows + Object Storage ──
-
-const PORTRAIT_STYLES = [
-  'Dramatic collectible card style with rich gold and dark tones, cinematic rim lighting, intense atmosphere',
-  'Premium card portrait with warm cinematic lighting, rich amber and dark tones, refined detail',
-  'Bold collectible card style with deep shadows, golden accents, sharp dramatic lighting',
-];
-
-router.post('/enhance-photo-multi', async (req, res) => {
-  const { photo, name, title } = req.body;
-  const render = getRender();
-
-  if (!process.env.OPENAI_API_KEY || !render || !photo) {
-    return res.status(400).json({ error: 'AI or Workflows not available' });
-  }
-
-  try {
-    // Upload photo to object storage via SDK
-    const objectKey = `portraits/${crypto.randomUUID()}.png`;
-    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-
-    console.log(`[portraits] Uploading photo to object storage: ${objectKey} (${imageBuffer.length} bytes)`);
-    await render.experimental.storage.objects.put({
-      key: objectKey,
-      data: imageBuffer,
-    });
-    console.log(`[portraits] Upload complete`);
-
-    // Create session in pending state
-    const sessionId = crypto.randomUUID();
-    portraitSessions.set(sessionId, {
-      status: 'pending',
-      createdAt: Date.now(),
-    });
-
-    // Start 3 workflow tasks via SDK
-    const runs = await Promise.all(
-      PORTRAIT_STYLES.map(style =>
-        render.workflows.startTask('render-cards-workflow/generate-verified-portrait', [objectKey, name, title, style])
-      )
-    );
-    const taskRunIds = runs.map(r => r.taskRunId);
-    console.log(`[portraits] Started 3 tasks: ${taskRunIds.join(', ')}`);
-
-    // Wait for all 3 in background, each via its own SSE stream
-    (async () => {
-      try {
-        const results = await Promise.all(runs.map(r => r.get()));
-
-        console.log(`[portraits] All 3 completed for session ${sessionId}`);
-        const session = portraitSessions.get(sessionId);
-        if (!session) return;
-
-        // Results are object storage keys — download via SDK
-        const resultKeys = results.map(r => r.results?.[0] || r.results);
-        console.log(`[portraits] Downloading results: ${resultKeys.join(', ')}`);
-
-        const images = await Promise.all(resultKeys.map(async (key) => {
-          try {
-            const obj = await render.experimental.storage.objects.get({ key });
-            return `data:image/png;base64,${obj.data.toString('base64')}`;
-          } catch (err) {
-            console.error(`[portraits] Failed to download result ${key}: ${err.message}`);
-            return null;
-          }
-        }));
-
-        session.status = 'ready';
-        session.images = images;
-
-        // Clean up all objects (source photo + result portraits)
-        const keysToDelete = [objectKey, ...resultKeys];
-        for (const key of keysToDelete) {
-          render.experimental.storage.objects.delete({ key }).catch(() => {});
-        }
-      } catch (err) {
-        console.error(`[portraits] Error: ${err.message}`);
-        const session = portraitSessions.get(sessionId);
-        if (session) {
-          session.status = 'failed';
-          session.error = err.message;
-        }
-      }
-    })();
-
-    res.json({ sessionId });
-  } catch (err) {
-    console.error('Multi-portrait error:', err.message, err.stack);
-    res.status(500).json({ error: 'Failed to generate portraits' });
-  }
-});
-
-router.get('/portraits/:sessionId', (req, res) => {
-  const session = portraitSessions.get(req.params.sessionId);
-  if (!session) {
-    return res.status(404).json({ error: 'Session expired or not found' });
-  }
-  if (session.status === 'pending') {
-    return res.json({ status: 'pending' });
-  }
-  if (session.status === 'failed') {
-    return res.status(500).json({ status: 'failed', error: session.error });
-  }
-  res.json({ status: 'ready', images: session.images });
-});
-
-router.get('/portraits/:sessionId/:index', (req, res) => {
-  const session = portraitSessions.get(req.params.sessionId);
-  if (!session) {
-    return res.status(404).json({ error: 'Session expired or not found' });
-  }
-  if (session.status !== 'ready') {
-    return res.status(400).json({ error: 'Portraits not ready yet' });
-  }
-  const idx = parseInt(req.params.index, 10);
-  if (isNaN(idx) || idx < 0 || idx >= session.images.length) {
-    return res.status(400).json({ error: 'Invalid index' });
-  }
-  res.json({ image: session.images[idx] });
 });
 
 // ── Card Persistence Routes ──
@@ -277,17 +101,24 @@ router.get('/portraits/:sessionId/:index', (req, res) => {
 // Save card PNG + metadata
 router.post('/cards', async (req, res) => {
   try {
-    const { name, title, skills, stats, photo_url, image } = req.body;
+    const { name, role, funTitle, tagline, responses, stats, image } = req.body;
 
-    if (!name || !title || !image) {
-      return res.status(400).json({ error: 'name, title, and image are required' });
+    if (!name || !image) {
+      return res.status(400).json({ error: 'name and image are required' });
     }
 
     const result = await pool.query(
-      `INSERT INTO cards (name, title, skills, stats, photo_url)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO cards (name, title, fun_title, tagline, responses, stats)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
-      [name, title, JSON.stringify(skills || []), JSON.stringify(stats || []), photo_url || null]
+      [
+        name,
+        role || '',
+        funTitle || '',
+        tagline || '',
+        JSON.stringify(responses || {}),
+        JSON.stringify(stats || []),
+      ]
     );
 
     const id = result.rows[0].id;
@@ -308,7 +139,7 @@ router.post('/cards', async (req, res) => {
 router.get('/cards', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, title, created_at FROM cards ORDER BY created_at DESC'
+      'SELECT id, name, title, fun_title, created_at FROM cards ORDER BY created_at DESC'
     );
     res.json(result.rows);
   } catch (err) {

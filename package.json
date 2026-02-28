@@ -1,13 +1,12 @@
 {
-  "name": "render-stat-cards",
-  "version": "1.0.0",
-  "description": "Premium trading-style stat cards for Render employees",
+  "name": "rendervous-cards",
+  "version": "2.0.0",
+  "description": "Rendervous trading cards for Render offsites",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "@renderinc/sdk": "^0.4.1",
     "express": "^4.18.2",
     "openai": "^4.96.0",
     "pg": "^8.13.1"
