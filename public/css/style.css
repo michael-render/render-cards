@@ -1,4 +1,29 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Raleway:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  /* Render brand palette */
+  --render-navy: #181B38;
+  --render-navy-light: #1E2247;
+  --render-navy-deep: #12142D;
+  --render-purple: #4351E8;
+  --render-purple-light: #6570F0;
+  --render-purple-dim: #343FBF;
+  --render-purple-glow: rgba(67, 81, 232, 0.25);
+
+  /* Render icon gradient stops */
+  --grad-red: #e71a43;
+  --grad-magenta: #e817c9;
+  --grad-purple: #c416e9;
+  --grad-violet: #9a3bf1;
+  --grad-blue: #3892f3;
+
+  /* Functional */
+  --text-primary: #EEEEF4;
+  --text-secondary: #8B8EA8;
+  --text-dim: #5D6080;
+  --surface: rgba(255, 255, 255, 0.04);
+  --border: rgba(67, 81, 232, 0.2);
+}
 
 * {
   margin: 0;
@@ -7,10 +32,10 @@
 }
 
 body {
-  background: linear-gradient(170deg, #0a0a0f 0%, #12121a 50%, #0e0e16 100%);
+  background: linear-gradient(175deg, var(--render-navy-light) 0%, var(--render-navy) 50%, var(--render-navy-deep) 100%);
   min-height: 100vh;
-  font-family: 'Raleway', sans-serif;
-  color: #e0d6c2;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -28,83 +53,82 @@ body {
 }
 
 .form-header h1 {
-  font-family: 'Oswald', sans-serif;
-  font-size: 36px;
-  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  font-size: 32px;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 3px;
-  background: linear-gradient(180deg, #F5E6B8 0%, #D4AF37 50%, #8B6914 100%);
+  letter-spacing: 2px;
+  background: linear-gradient(90deg, var(--grad-blue), var(--grad-violet), var(--grad-magenta), var(--grad-red));
   -webkit-background-clip: text;
-  background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 8px;
 }
 
 .form-header p {
   font-size: 13px;
-  font-weight: 300;
-  color: #8a7f6a;
-  letter-spacing: 1px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
 }
 
 .gallery-link {
   display: inline-block;
   margin-top: 12px;
   font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: #D4AF37;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--render-purple-light);
   text-decoration: none;
-  border: 1px solid rgba(212, 175, 55, 0.3);
+  border: 1px solid var(--border);
   padding: 6px 18px;
-  border-radius: 4px;
+  border-radius: 6px;
   transition: all 0.2s;
 }
 
 .gallery-link:hover {
-  background: rgba(212, 175, 55, 0.1);
-  border-color: rgba(212, 175, 55, 0.5);
+  background: rgba(67, 81, 232, 0.08);
+  border-color: rgba(67, 81, 232, 0.5);
+  box-shadow: 0 0 12px var(--render-purple-glow);
 }
 
 /* ── Form Fields ── */
 .field {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .field label {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: #D4AF37;
-  margin-bottom: 8px;
+  color: var(--render-purple-light);
+  margin-bottom: 6px;
+  letter-spacing: 0.3px;
 }
 
 .field input[type="text"],
 .field textarea {
   width: 100%;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(212, 175, 55, 0.2);
+  padding: 11px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #e0d6c2;
-  font-family: 'Raleway', sans-serif;
-  font-size: 15px;
-  transition: border-color 0.2s;
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
 }
 
 .field input[type="text"]:focus,
 .field textarea:focus {
-  border-color: rgba(212, 175, 55, 0.5);
-  box-shadow: 0 0 12px rgba(212, 175, 55, 0.08);
+  border-color: rgba(67, 81, 232, 0.5);
+  box-shadow: 0 0 12px rgba(67, 81, 232, 0.1);
 }
 
 .field input::placeholder,
 .field textarea::placeholder {
-  color: #4a4538;
+  color: var(--text-dim);
 }
 
 .field textarea {
@@ -114,65 +138,31 @@ body {
 
 /* ── Photo Section ── */
 .photo-section {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .photo-section label {
   display: block;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: #D4AF37;
-  margin-bottom: 8px;
-}
-
-.photo-tabs {
-  display: flex;
-  gap: 0;
-  margin-bottom: 12px;
-}
-
-.photo-tab {
-  flex: 1;
-  padding: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(212, 175, 55, 0.15);
-  color: #8a7f6a;
-  font-family: 'Raleway', sans-serif;
   font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.2s;
+  font-weight: 600;
+  color: var(--render-purple-light);
+  margin-bottom: 6px;
+  letter-spacing: 0.3px;
 }
-
-.photo-tab:first-child { border-radius: 6px 0 0 6px; }
-.photo-tab:last-child { border-radius: 0 6px 6px 0; }
-
-.photo-tab.active {
-  background: rgba(212, 175, 55, 0.1);
-  border-color: rgba(212, 175, 55, 0.4);
-  color: #D4AF37;
-}
-
-.photo-panel { display: none; }
-.photo-panel.active { display: block; }
 
 .file-upload {
   position: relative;
   width: 100%;
   padding: 24px;
-  border: 2px dashed rgba(212, 175, 55, 0.2);
-  border-radius: 6px;
+  border: 2px dashed var(--border);
+  border-radius: 8px;
   text-align: center;
   cursor: pointer;
   transition: border-color 0.2s;
 }
 
 .file-upload:hover {
-  border-color: rgba(212, 175, 55, 0.4);
+  border-color: rgba(67, 81, 232, 0.5);
 }
 
 .file-upload input[type="file"] {
@@ -184,11 +174,11 @@ body {
 
 .file-upload-text {
   font-size: 13px;
-  color: #8a7f6a;
+  color: var(--text-secondary);
 }
 
 .file-upload-text strong {
-  color: #D4AF37;
+  color: var(--render-purple-light);
 }
 
 .photo-preview {
@@ -200,39 +190,7 @@ body {
   max-width: 120px;
   max-height: 150px;
   border-radius: 6px;
-  border: 1px solid rgba(212, 175, 55, 0.3);
-}
-
-/* ── Skills ── */
-.skills-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-/* ── AI Badge ── */
-.ai-badge {
-  display: inline-block;
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  padding: 2px 8px;
-  border-radius: 3px;
-  margin-left: 8px;
-  vertical-align: middle;
-}
-
-.ai-badge--on {
-  background: rgba(212, 175, 55, 0.15);
-  color: #D4AF37;
-  border: 1px solid rgba(212, 175, 55, 0.3);
-}
-
-.ai-badge--off {
-  background: rgba(255, 255, 255, 0.05);
-  color: #5a5548;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
 }
 
 /* ── Submit ── */
@@ -240,22 +198,21 @@ body {
   width: 100%;
   padding: 14px;
   margin-top: 12px;
-  font-family: 'Oswald', sans-serif;
-  font-size: 18px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 3px;
+  letter-spacing: 1px;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  background: linear-gradient(135deg, #8B6914, #D4AF37);
-  color: #0a0a0f;
+  background: var(--render-purple);
+  color: #fff;
   transition: all 0.2s;
 }
 
 .submit-btn:hover {
-  background: linear-gradient(135deg, #D4AF37, #F5E6B8);
-  box-shadow: 0 0 24px rgba(212, 175, 55, 0.25);
+  background: var(--render-purple-light);
+  box-shadow: 0 0 24px var(--render-purple-glow);
 }
 
 .submit-btn:disabled {
@@ -268,10 +225,10 @@ body {
   text-align: center;
   margin-top: 12px;
   font-size: 13px;
-  color: #8a7f6a;
+  color: var(--text-secondary);
   min-height: 20px;
 }
 
 .status.error {
-  color: #c0392b;
+  color: var(--grad-red);
 }

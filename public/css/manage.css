@@ -1,4 +1,21 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Raleway:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --render-navy: #181B38;
+  --render-navy-light: #1E2247;
+  --render-navy-deep: #12142D;
+  --render-purple: #4351E8;
+  --render-purple-light: #6570F0;
+  --render-purple-glow: rgba(67, 81, 232, 0.25);
+  --grad-red: #e71a43;
+  --grad-magenta: #e817c9;
+  --grad-violet: #9a3bf1;
+  --grad-blue: #3892f3;
+  --text-primary: #EEEEF4;
+  --text-secondary: #8B8EA8;
+  --text-dim: #5D6080;
+  --border: rgba(67, 81, 232, 0.2);
+}
 
 * {
   margin: 0;
@@ -7,10 +24,10 @@
 }
 
 body {
-  background: linear-gradient(170deg, #0a0a0f 0%, #12121a 50%, #0e0e16 100%);
+  background: linear-gradient(175deg, var(--render-navy-light) 0%, var(--render-navy) 50%, var(--render-navy-deep) 100%);
   min-height: 100vh;
-  font-family: 'Raleway', sans-serif;
-  color: #e0d6c2;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
+  color: var(--text-primary);
 }
 
 /* ── Header ── */
@@ -20,23 +37,23 @@ body {
 }
 
 .gallery-header h1 {
-  font-family: 'Oswald', sans-serif;
-  font-size: 36px;
-  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  font-size: 32px;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 3px;
-  background: linear-gradient(180deg, #F5E6B8 0%, #D4AF37 50%, #8B6914 100%);
+  letter-spacing: 2px;
+  background: linear-gradient(90deg, var(--grad-blue), var(--grad-violet), var(--grad-magenta), var(--grad-red));
   -webkit-background-clip: text;
-  background-clip: text;
   -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 8px;
 }
 
 .gallery-header p {
   font-size: 13px;
-  font-weight: 300;
-  color: #8a7f6a;
-  letter-spacing: 1px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
 }
 
 .gallery-nav {
@@ -48,20 +65,20 @@ body {
 
 .gallery-nav a {
   font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 2px;
-  color: #D4AF37;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--render-purple-light);
   text-decoration: none;
-  border: 1px solid rgba(212, 175, 55, 0.3);
+  border: 1px solid var(--border);
   padding: 6px 18px;
-  border-radius: 4px;
+  border-radius: 6px;
   transition: all 0.2s;
 }
 
 .gallery-nav a:hover {
-  background: rgba(212, 175, 55, 0.1);
-  border-color: rgba(212, 175, 55, 0.5);
+  background: rgba(67, 81, 232, 0.08);
+  border-color: rgba(67, 81, 232, 0.5);
+  box-shadow: 0 0 12px var(--render-purple-glow);
 }
 
 /* ── Grid ── */
@@ -75,8 +92,8 @@ body {
 }
 
 .gallery-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(212, 175, 55, 0.12);
+  background: rgba(67, 81, 232, 0.03);
+  border: 1px solid var(--border);
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.25s ease;
@@ -94,44 +111,42 @@ body {
 }
 
 .gallery-card-name {
-  font-family: 'Oswald', sans-serif;
-  font-size: 16px;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  color: #D4AF37;
+  letter-spacing: 0.5px;
+  color: var(--render-purple-light);
   margin-bottom: 2px;
 }
 
 .gallery-card-title {
   font-size: 11px;
-  font-weight: 400;
-  color: #8a7f6a;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  font-weight: 500;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
 }
 
 /* ── Delete Button ── */
 .delete-btn {
-  font-family: 'Raleway', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  letter-spacing: 0.5px;
   width: calc(100% - 28px);
   margin: 0 14px 12px;
   padding: 8px 0;
-  border: 2px solid #c0392b;
+  border: 1px solid var(--grad-red);
   border-radius: 6px;
   background: transparent;
-  color: #c0392b;
+  color: var(--grad-red);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .delete-btn:hover {
-  background: rgba(192, 57, 43, 0.15);
-  box-shadow: 0 0 12px rgba(192, 57, 43, 0.15);
+  background: rgba(231, 26, 67, 0.1);
+  box-shadow: 0 0 12px rgba(231, 26, 67, 0.15);
 }
 
 .delete-btn:disabled {
@@ -143,7 +158,7 @@ body {
 .gallery-empty {
   text-align: center;
   padding: 80px 20px;
-  color: #5a5548;
+  color: var(--text-secondary);
   font-size: 15px;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
 }

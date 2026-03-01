@@ -3,55 +3,70 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Render Stat Cards</title>
+  <title>Rendervous Trading Cards</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
   <div class="form-container">
     <div class="form-header">
-      <h1>Render Stat Cards</h1>
-      <p>Generate your premium trading card</p>
+      <h1>Rendervous Cards</h1>
+      <p>Create your trading card</p>
       <a href="/gallery.html" class="gallery-link">View Gallery</a>
     </div>
 
     <form id="card-form">
       <div class="field">
-        <label for="name">Name</label>
+        <label for="name">What's your name?</label>
         <input type="text" id="name" placeholder="Your name" required>
       </div>
 
       <div class="field">
-        <label for="title">Title</label>
-        <input type="text" id="title" placeholder="e.g. Senior Software Engineer" required>
+        <label for="role">What's your role at Render?</label>
+        <input type="text" id="role" placeholder="e.g. Software Engineer, Designer, PM" required>
       </div>
 
       <div class="photo-section">
-        <label>Photo <span class="ai-badge ai-badge--off" id="ai-photo-badge">AI Off</span></label>
-        <div class="photo-tabs">
-          <button type="button" class="photo-tab active" data-tab="upload">Upload</button>
-          <button type="button" class="photo-tab" data-tab="ai" id="ai-tab">AI Generate</button>
+        <label>Upload a photo of yourself</label>
+        <div class="file-upload">
+          <input type="file" id="photo-file" accept="image/*">
+          <div class="file-upload-text"><strong>Click to upload</strong> or drag a photo</div>
         </div>
-        <div class="photo-panel active" id="panel-upload">
-          <div class="file-upload">
-            <input type="file" id="photo-file" accept="image/*">
-            <div class="file-upload-text"><strong>Click to upload</strong> or drag a photo</div>
-          </div>
-          <div class="photo-preview" id="photo-preview"></div>
-        </div>
-        <div class="photo-panel" id="panel-ai">
-          <div class="field" style="margin-bottom:0">
-            <textarea id="photo-description" placeholder="Describe appearance: e.g. woman with curly brown hair, glasses, smiling"></textarea>
-          </div>
-        </div>
+        <div class="photo-preview" id="photo-preview"></div>
       </div>
 
       <div class="field">
-        <label>Top Skills</label>
-        <div class="skills-group">
-          <input type="text" id="skill-0" placeholder="Skill 1, e.g. Cloud Infrastructure" required>
-          <input type="text" id="skill-1" placeholder="Skill 2, e.g. System Design" required>
-          <input type="text" id="skill-2" placeholder="Skill 3, e.g. Team Leadership" required>
-        </div>
+        <label for="hobby">What do you like to do outside of work?</label>
+        <input type="text" id="hobby" placeholder="e.g. Surfing, baking sourdough, competitive napping">
+      </div>
+
+      <div class="field">
+        <label for="unpopular-opinion">What's your most #unpopular-opinion?</label>
+        <input type="text" id="unpopular-opinion" placeholder="e.g. Tabs are better than spaces">
+      </div>
+
+      <div class="field">
+        <label for="work-hack">What's a work hack you swear by?</label>
+        <input type="text" id="work-hack" placeholder="e.g. No meetings before 11am">
+      </div>
+
+      <div class="field">
+        <label for="emoji">What's your favorite emoji?</label>
+        <input type="text" id="emoji" placeholder="e.g. :cat-nodding: or just paste one 🐱">
+      </div>
+
+      <div class="field">
+        <label for="desert-island">3 non-essentials you'd bring to a desert island?</label>
+        <input type="text" id="desert-island" placeholder="e.g. Hammock, hot sauce, a good playlist">
+      </div>
+
+      <div class="field">
+        <label for="superpower">What's your mundane superpower?</label>
+        <input type="text" id="superpower" placeholder="e.g. I always pick the fastest checkout line">
+      </div>
+
+      <div class="field">
+        <label for="motivation">What motivates you?</label>
+        <input type="text" id="motivation" placeholder="e.g. Shipping things people love">
       </div>
 
       <button type="submit" class="submit-btn" id="submit-btn">Generate Card</button>

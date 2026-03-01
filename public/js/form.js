@@ -1,33 +1,5 @@
-document.addEventListener('DOMContentLoaded', async () => {
-  let aiEnabled = false;
+document.addEventListener('DOMContentLoaded', () => {
   let photoDataUrl = null;
-
-  // Check AI availability
-  try {
-    const res = await fetch('/api/health');
-    const data = await res.json();
-    aiEnabled = data.aiEnabled;
-  } catch (e) {
-    // AI not available
-  }
-
-  // Update AI badges
-  const badge = document.getElementById('ai-photo-badge');
-  if (aiEnabled) {
-    badge.textContent = 'AI On';
-    badge.className = 'ai-badge ai-badge--on';
-  }
-
-  // Photo tab switching
-  const tabs = document.querySelectorAll('.photo-tab');
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      document.querySelectorAll('.photo-panel').forEach(p => p.classList.remove('active'));
-      document.getElementById(`panel-${tab.dataset.tab}`).classList.add('active');
-    });
-  });
 
   // Restore form state if returning from card preview
   const saved = sessionStorage.getItem('formData');
@@ -35,24 +7,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const f = JSON.parse(saved);
       document.getElementById('name').value = f.name || '';
-      document.getElementById('title').value = f.title || '';
-      if (f.skills) {
-        f.skills.forEach((s, i) => {
-          const el = document.getElementById(`skill-${i}`);
-          if (el) el.value = s;
-        });
-      }
-      if (f.photoDescription) {
-        document.getElementById('photo-description').value = f.photoDescription;
-      }
+      document.getElementById('role').value = f.role || '';
+      document.getElementById('hobby').value = f.hobby || '';
+      document.getElementById('unpopular-opinion').value = f.unpopularOpinion || '';
+      document.getElementById('work-hack').value = f.workHack || '';
+      document.getElementById('emoji').value = f.emoji || '';
+      document.getElementById('desert-island').value = f.desertIsland || '';
+      document.getElementById('superpower').value = f.superpower || '';
+      document.getElementById('motivation').value = f.motivation || '';
       if (f.photoDataUrl) {
         photoDataUrl = f.photoDataUrl;
         document.getElementById('photo-preview').innerHTML =
           `<img src="${photoDataUrl}" alt="Preview">`;
-      }
-      if (f.activeTab && f.activeTab !== 'upload') {
-        const tab = document.querySelector(`.photo-tab[data-tab="${f.activeTab}"]`);
-        if (tab) tab.click();
       }
     } catch (e) {
       // Ignore corrupt data
@@ -60,7 +26,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     sessionStorage.removeItem('formData');
   }
 
-  // Resize image to fit card photo frame (max 480x600)
+  // Resize image to fit card photo frame
   function resizeImage(dataUrl, maxW, maxH) {
     return new Promise((resolve) => {
       const img = new Image();
@@ -100,16 +66,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
 
     const name = document.getElementById('name').value.trim();
-    const title = document.getElementById('title').value.trim();
-    const skills = [
-      document.getElementById('skill-0').value.trim(),
-      document.getElementById('skill-1').value.trim(),
-      document.getElementById('skill-2').value.trim()
-    ].filter(Boolean);
+    const role = document.getElementById('role').value.trim();
 
-    if (!name || !title || skills.length < 3) {
+    if (!name || !role) {
       const status = document.getElementById('status');
-      status.textContent = 'Please fill in all fields including all 3 skills.';
+      status.textContent = 'Please fill in your name and role.';
+      status.className = 'status error';
+      return;
+    }
+
+    if (!photoDataUrl) {
+      const status = document.getElementById('status');
+      status.textContent = 'Please upload a photo.';
       status.className = 'status error';
       return;
     }
@@ -121,131 +89,90 @@ document.addEventListener('DOMContentLoaded', async () => {
     status.textContent = '';
     status.className = 'status';
 
-    try {
-      // Get photo
-      let photo = photoDataUrl;
-      const activeTab = document.querySelector('.photo-tab.active').dataset.tab;
+    const responses = {
+      hobby: document.getElementById('hobby').value.trim(),
+      unpopularOpinion: document.getElementById('unpopular-opinion').value.trim(),
+      workHack: document.getElementById('work-hack').value.trim(),
+      emoji: document.getElementById('emoji').value.trim(),
+      desertIsland: document.getElementById('desert-island').value.trim(),
+      superpower: document.getElementById('superpower').value.trim(),
+      motivation: document.getElementById('motivation').value.trim(),
+    };
 
-      if (activeTab === 'ai' && aiEnabled) {
-        const desc = document.getElementById('photo-description').value.trim();
-        if (desc) {
-          status.textContent = 'Generating AI photo...';
-          const res = await fetch('/api/generate-image', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ description: desc })
-          });
-          const data = await res.json();
-          if (data.image) {
-            photo = data.image;
-          } else if (data.message) {
-            status.textContent = data.message;
-          }
-        }
+    // Save form state so "Back" restores entries
+    const formState = { name, role, ...responses, photoDataUrl };
+
+    try {
+      // Try multi-variant generation first (3 variants → pick page)
+      status.textContent = 'Generating your card variants...';
+      const multiRes = await fetch('/api/generate-card-multi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, role, ...responses }),
+      });
+
+      if (!multiRes.ok) throw new Error('multi-failed');
+      const multiData = await multiRes.json();
+
+      // Build pick session with shared person info
+      const pickSession = {
+        name,
+        role,
+        photo: photoDataUrl,
+        responses,
+      };
+
+      if (multiData.sessionId) {
+        // Workflow path — poll on pick page
+        pickSession.sessionId = multiData.sessionId;
+      } else if (multiData.variants) {
+        // Synchronous fallback — embed variants directly
+        pickSession.variants = multiData.variants;
       }
 
-      if (!photo) {
-        status.textContent = 'Please upload a photo or generate one with AI.';
+      sessionStorage.setItem('pickSession', JSON.stringify(pickSession));
+      sessionStorage.setItem('formData', JSON.stringify(formState));
+      window.location.href = '/pick.html';
+
+    } catch (multiErr) {
+      // Fallback: single variant → card.html directly
+      console.warn('Multi-variant failed, falling back to single:', multiErr.message);
+      try {
+        status.textContent = 'Generating your card...';
+        const res = await fetch('/api/generate-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, role, ...responses }),
+        });
+
+        if (!res.ok) throw new Error('Failed to generate card');
+        const cardContent = await res.json();
+
+        const cardData = {
+          name,
+          role,
+          photo: photoDataUrl,
+          responses,
+          funTitle: cardContent.funTitle,
+          tagline: cardContent.tagline,
+          resolvedEmoji: cardContent.resolvedEmoji,
+          stats: cardContent.stats,
+        };
+
+        sessionStorage.setItem('cardData', JSON.stringify(cardData));
+        sessionStorage.setItem('formData', JSON.stringify(formState));
+        window.location.href = '/card.html';
+
+      } catch (singleErr) {
+        console.error(singleErr);
+        const msg = singleErr.name === 'QuotaExceededError'
+          ? 'Photo is too large. Please use a smaller image.'
+          : 'Something went wrong. Please try again.';
+        status.textContent = msg;
         status.className = 'status error';
         btn.disabled = false;
         btn.textContent = 'Generate Card';
-        return;
       }
-
-      // Enhance uploaded photo with AI vision + DALL-E
-      if (aiEnabled && photoDataUrl && photo === photoDataUrl) {
-        // Try multi-portrait workflow first
-        try {
-          status.textContent = 'Generating 3 AI portrait styles...';
-          const multiRes = await fetch('/api/enhance-photo-multi', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ photo: photoDataUrl, name, title })
-          });
-          if (multiRes.ok) {
-            const multiData = await multiRes.json();
-            if (multiData.sessionId) {
-              // Store pick session and form state, then navigate
-              sessionStorage.setItem('pickSession', JSON.stringify({
-                sessionId: multiData.sessionId,
-                name,
-                title,
-                skills
-              }));
-              sessionStorage.setItem('formData', JSON.stringify({
-                name,
-                title,
-                skills,
-                photoDataUrl,
-                activeTab,
-                photoDescription: document.getElementById('photo-description').value
-              }));
-              window.location.href = '/pick.html';
-              return;
-            }
-          }
-        } catch (e) {
-          // Multi-portrait failed — fall back to single
-        }
-
-        // Fallback: single portrait enhancement
-        try {
-          status.textContent = 'Enhancing photo with AI...';
-          const enhanceRes = await fetch('/api/enhance-photo', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ photo: photoDataUrl, name, title })
-          });
-          if (enhanceRes.ok) {
-            const enhanceData = await enhanceRes.json();
-            if (enhanceData.image) photo = enhanceData.image;
-          }
-        } catch (e) {
-          // Enhancement failed — use original photo silently
-        }
-      }
-
-      // Generate stats
-      status.textContent = 'Generating stats...';
-      const statsRes = await fetch('/api/generate-stats', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, title, skills })
-      });
-      const statsData = await statsRes.json();
-
-      // Store data and navigate
-      const cardData = {
-        name,
-        title,
-        photo,
-        skills: skills.length ? skills : ['Leadership', 'Innovation', 'Excellence'],
-        stats: statsData.stats
-      };
-
-      sessionStorage.setItem('cardData', JSON.stringify(cardData));
-
-      // Save form state so "Back" from preview restores entries
-      sessionStorage.setItem('formData', JSON.stringify({
-        name,
-        title,
-        skills,
-        photoDataUrl,
-        activeTab,
-        photoDescription: document.getElementById('photo-description').value
-      }));
-
-      window.location.href = '/card.html';
-
-    } catch (err) {
-      console.error(err);
-      const msg = err.name === 'QuotaExceededError'
-        ? 'Photo is too large. Please use a smaller image.'
-        : 'Something went wrong. Please try again.';
-      status.textContent = msg;
-      status.className = 'status error';
-      btn.disabled = false;
-      btn.textContent = 'Generate Card';
     }
   });
 });

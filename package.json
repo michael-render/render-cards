@@ -1,7 +1,7 @@
 {
-  "name": "render-stat-cards",
-  "version": "1.0.0",
-  "description": "Premium trading-style stat cards for Render employees",
+  "name": "rendervous-cards",
+  "version": "2.0.0",
+  "description": "Rendervous trading cards for Render offsites",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

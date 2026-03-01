@@ -1,125 +1,121 @@
-document.addEventListener('DOMContentLoaded', async () => {
-  const status = document.getElementById('status');
-  const portraits = document.getElementById('portraits');
-
-  // Read session info from sessionStorage
-  const raw = sessionStorage.getItem('pickSession');
-  if (!raw) {
-    status.textContent = 'No session found. Redirecting...';
-    status.className = 'pick-status error';
-    setTimeout(() => { window.location.href = '/'; }, 1500);
-    return;
-  }
-
-  let pickSession;
-  try {
-    pickSession = JSON.parse(raw);
-  } catch (e) {
-    status.textContent = 'Invalid session. Redirecting...';
-    status.className = 'pick-status error';
-    setTimeout(() => { window.location.href = '/'; }, 1500);
-    return;
-  }
-
-  const { sessionId, name, title, skills } = pickSession;
-
-  // Back button: restore formData and go to form
-  document.getElementById('back-btn').addEventListener('click', () => {
+document.addEventListener('DOMContentLoaded', () => {
+  const session = JSON.parse(sessionStorage.getItem('pickSession'));
+  if (!session) {
     window.location.href = '/';
-  });
+    return;
+  }
 
-  // Poll for portraits until ready
-  status.textContent = 'Generating 3 AI portrait styles...';
-  const POLL_INTERVAL = 3000;
-  const MAX_POLLS = 100;
+  const statusEl = document.getElementById('pick-status');
+  const variantsEl = document.getElementById('variants');
 
-  let data;
-  try {
-    for (let i = 0; i < MAX_POLLS; i++) {
-      const res = await fetch(`/api/portraits/${sessionId}`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        if (res.status === 404) throw new Error('Session expired');
-        if (res.status === 500) throw new Error(err.error || 'Generation failed');
-        throw new Error(err.error || 'Unexpected error');
+  // If variants were embedded (fallback mode), render immediately
+  if (session.variants) {
+    renderVariants(session.variants);
+    return;
+  }
+
+  // Otherwise poll for workflow results
+  if (session.sessionId) {
+    pollVariants(session.sessionId);
+  } else {
+    showError('No session data found.');
+  }
+
+  function pollVariants(sessionId) {
+    let polls = 0;
+    const maxPolls = 30;
+    const interval = 2000;
+
+    const timer = setInterval(async () => {
+      polls++;
+      try {
+        const res = await fetch(`/api/variants/${sessionId}`);
+        if (!res.ok) throw new Error('Fetch failed');
+        const data = await res.json();
+
+        if (data.status === 'ready') {
+          clearInterval(timer);
+          renderVariants(data.variants);
+        } else if (data.status === 'error') {
+          clearInterval(timer);
+          showError(data.error || 'Generation failed.');
+        } else if (polls >= maxPolls) {
+          clearInterval(timer);
+          showError('Timed out waiting for variants.');
+        }
+      } catch (err) {
+        clearInterval(timer);
+        showError('Failed to load variants.');
       }
+    }, interval);
+  }
 
-      data = await res.json();
+  function showError(msg) {
+    statusEl.innerHTML = `<span>${msg}</span>`;
+    statusEl.classList.add('error');
+    statusEl.classList.remove('hidden');
+  }
 
-      if (data.status === 'ready') break;
+  function renderVariants(variants) {
+    statusEl.classList.add('hidden');
+    variantsEl.innerHTML = '';
 
-      if (data.status === 'failed') {
-        throw new Error(data.error || 'Portrait generation failed');
-      }
+    variants.forEach((v, i) => {
+      const card = document.createElement('div');
+      card.className = 'variant-card';
+      card.innerHTML = `
+        <span class="variant-number">${i + 1} / 3</span>
+        <div class="variant-emoji">${v.resolvedEmoji || '🤙'}</div>
+        <div class="variant-title">${escapeHtml(v.funTitle)}</div>
+        <div class="variant-tagline">"${escapeHtml(v.tagline)}"</div>
+        <div class="variant-stats">
+          ${(v.stats || []).map((s, si) => `
+            <div class="variant-stat-row">
+              <span class="variant-stat-label">${escapeHtml(s.label)}</span>
+              <div class="variant-stat-track">
+                <div class="variant-stat-fill" style="width: 0%"></div>
+              </div>
+              <span class="variant-stat-value">${s.value}</span>
+            </div>
+          `).join('')}
+        </div>
+      `;
 
-      // Still pending — wait and poll again
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL));
-    }
-
-    if (!data || data.status !== 'ready') {
-      throw new Error('Timed out waiting for portraits');
-    }
-
-    if (!data.images || data.images.length === 0) {
-      throw new Error('No portraits available');
-    }
-
-    // Display images
-    data.images.forEach((dataUrl, i) => {
-      const img = document.getElementById(`img-${i}`);
-      const loading = document.getElementById(`loading-${i}`);
-      if (img && loading) {
-        img.src = dataUrl;
-        img.classList.add('loaded');
-        loading.classList.add('hidden');
-      }
+      card.addEventListener('click', () => selectVariant(v));
+      variantsEl.appendChild(card);
     });
 
-    status.textContent = '';
-
-    // Click handler: select portrait → generate stats → navigate to card
-    document.querySelectorAll('.portrait-card').forEach((card) => {
-      card.addEventListener('click', async () => {
-        const idx = parseInt(card.dataset.index, 10);
-        if (idx >= data.images.length) return;
-
-        // Visual feedback
-        document.querySelectorAll('.portrait-card').forEach(c => c.classList.remove('selected'));
-        card.classList.add('selected');
-        status.textContent = 'Generating stats...';
-
-        try {
-          const statsRes = await fetch('/api/generate-stats', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, title, skills })
-          });
-          const statsData = await statsRes.json();
-
-          const cardData = {
-            name,
-            title,
-            photo: data.images[idx],
-            skills: skills.length ? skills : ['Leadership', 'Innovation', 'Excellence'],
-            stats: statsData.stats
-          };
-
-          sessionStorage.setItem('cardData', JSON.stringify(cardData));
-          sessionStorage.removeItem('pickSession');
-          window.location.href = '/card.html';
-        } catch (err) {
-          console.error(err);
-          status.textContent = 'Failed to generate stats. Please try again.';
-          status.className = 'pick-status error';
-        }
+    // Animate stat bars in after a brief delay
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        variantsEl.querySelectorAll('.variant-stat-fill').forEach(bar => {
+          const value = bar.closest('.variant-stat-row').querySelector('.variant-stat-value').textContent;
+          bar.style.width = `${value}%`;
+        });
       });
     });
-  } catch (err) {
-    console.error(err);
-    status.textContent = err.message === 'Session expired'
-      ? 'Session expired. Redirecting...'
-      : err.message || 'Failed to load portraits. Redirecting...';
-    status.className = 'pick-status error';
-    setTimeout(() => { window.location.href = '/'; }, 2000);
+  }
+
+  function selectVariant(variant) {
+    const cardData = {
+      name: session.name,
+      role: session.role,
+      photo: session.photo,
+      responses: session.responses,
+      funTitle: variant.funTitle,
+      tagline: variant.tagline,
+      resolvedEmoji: variant.resolvedEmoji,
+      stats: variant.stats,
+    };
+
+    sessionStorage.setItem('cardData', JSON.stringify(cardData));
+    sessionStorage.removeItem('pickSession');
+    window.location.href = '/card.html';
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
   }
 });

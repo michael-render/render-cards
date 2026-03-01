@@ -15,23 +15,100 @@ function getOpenAI() {
 
 function getRender() {
   if (!process.env.RENDER_API_KEY) return null;
-  const { Render } = require('@renderinc/sdk');
-  return new Render({
-    ownerId: process.env.RENDER_OWNER_ID,
-    region: process.env.RENDER_REGION || 'oregon',
-  });
+  try {
+    const { Render } = require('@renderinc/sdk');
+    return new Render({ token: process.env.RENDER_API_KEY });
+  } catch (err) {
+    console.warn('Render SDK not available:', err.message);
+    return null;
+  }
 }
 
-// ── Portrait Session Store (in-memory, 15-min TTL) ──
-const portraitSessions = new Map();
+// ── Variant session store (in-memory, 15-min TTL) ──
+const variantSessions = new Map();
 const SESSION_TTL = 15 * 60 * 1000;
 
-setInterval(() => {
+function cleanExpiredSessions() {
   const now = Date.now();
-  for (const [id, session] of portraitSessions) {
-    if (now - session.createdAt > SESSION_TTL) portraitSessions.delete(id);
+  for (const [id, session] of variantSessions) {
+    if (now - session.createdAt > SESSION_TTL) variantSessions.delete(id);
   }
-}, 60 * 1000);
+}
+
+// ── Shared AI prompt builder ──
+function buildCardPrompt(personData) {
+  const { name, role, hobby, unpopularOpinion, workHack, emoji, desertIsland, superpower, motivation } = personData;
+  return {
+    system: `You create fun trading card content for a company offsite. Return JSON with exactly these fields:
+{
+  "funTitle": "A funny/creative 2-4 word title (NOT their real role). Make it playful and specific to them.",
+  "tagline": "A witty one-liner (max 15 words) that captures their personality based on their responses.",
+  "resolvedEmoji": "Convert their favorite emoji text (e.g. ':fire:', ':cat-nodding:', ':rocket:') into the closest single Unicode emoji character. If already a Unicode emoji, keep it. If you can't resolve it, use 🤙.",
+  "stats": [{"label": "1-2 word label", "value": number}, ...] (exactly 3 stats, values 80-99, make them fun and relevant to their answers)
+}
+Be creative, funny, and specific to the person. Avoid generic corporate speak.`,
+    user: `Generate trading card content for:
+Name: ${name}
+Role: ${role}
+Hobby: ${hobby || 'not provided'}
+Unpopular Opinion: ${unpopularOpinion || 'not provided'}
+Work Hack: ${workHack || 'not provided'}
+Favorite Emoji: ${emoji || 'not provided'}
+Desert Island Items: ${desertIsland || 'not provided'}
+Mundane Superpower: ${superpower || 'not provided'}
+Motivation: ${motivation || 'not provided'}`,
+  };
+}
+
+function generateRandomVariant(emoji) {
+  const funTitles = [
+    'Chaos Coordinator', 'Vibe Architect', 'Snack Strategist',
+    'Meeting Survivor', 'Slack Ninja', 'Deploy Button Masher',
+    'Bug Whisperer', 'Coffee-Powered Engine', 'Keyboard Warrior',
+  ];
+  const taglines = [
+    'Bringing the energy since day one.',
+    'Will debug for snacks.',
+    'Probably thinking about lunch.',
+    'Living proof that caffeine works.',
+  ];
+  const statLabels = [
+    'Vibes', 'Hustle', 'Snack Game', 'Emoji Fluency', 'Hot Takes',
+    'Island Readiness', 'Chill Factor', 'Team Spirit', 'Curiosity',
+    'Wit', 'Boldness', 'Focus', 'Creativity', 'Resilience',
+  ];
+  const shuffled = [...statLabels].sort(() => Math.random() - 0.5);
+  return {
+    funTitle: funTitles[Math.floor(Math.random() * funTitles.length)],
+    tagline: taglines[Math.floor(Math.random() * taglines.length)],
+    resolvedEmoji: emoji || '🤙',
+    stats: shuffled.slice(0, 3).map(label => ({
+      label,
+      value: Math.floor(Math.random() * 15) + 85,
+    })),
+  };
+}
+
+async function generateAIVariant(openai, personData) {
+  const prompt = buildCardPrompt(personData);
+  const completion = await openai.chat.completions.create({
+    model: 'gpt-4o-mini',
+    temperature: 1.0,
+    messages: [
+      { role: 'system', content: prompt.system },
+      { role: 'user', content: prompt.user },
+    ],
+    response_format: { type: 'json_object' },
+  });
+
+  const parsed = JSON.parse(completion.choices[0].message.content);
+  return {
+    funTitle: parsed.funTitle || 'Mystery Human',
+    tagline: parsed.tagline || 'Living the dream.',
+    resolvedEmoji: parsed.resolvedEmoji || personData.emoji || '🤙',
+    stats: Array.isArray(parsed.stats) ? parsed.stats.slice(0, 3) : [],
+  };
+}
 
 // Health check — verifies DB is reachable before Render routes traffic
 router.get('/health', async (req, res) => {
@@ -43,233 +120,106 @@ router.get('/health', async (req, res) => {
   }
 });
 
-// Generate stats via GPT or fallback to random
-router.post('/generate-stats', async (req, res) => {
-  const { name, title, skills } = req.body;
+// Generate card content (fun title, tagline, stats) — single variant (used by Regenerate)
+router.post('/generate-card', async (req, res) => {
+  const personData = req.body;
   const openai = getOpenAI();
 
   if (!openai) {
-    const labels = [
-      'Leadership', 'Creativity', 'Execution', 'Strategy', 'Impact',
-      'Innovation', 'Teamwork', 'Vision', 'Drive', 'Expertise',
-      'Communication', 'Problem Solving', 'Adaptability', 'Focus'
-    ];
-    const shuffled = labels.sort(() => Math.random() - 0.5);
-    const stats = shuffled.slice(0, 3).map(label => ({
-      label,
-      value: Math.floor(Math.random() * 10) + 90
-    }));
-    return res.json({ stats });
+    return res.json(generateRandomVariant(personData.emoji));
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [{
-        role: 'system',
-        content: 'You generate trading card stats. Return exactly 3 stats as JSON array: [{"label": "short label", "value": number}]. Labels should be 1-2 words, values 85-99. Make them relevant to the person\'s role.'
-      }, {
-        role: 'user',
-        content: `Generate 3 trading card stats for ${name}, ${title}. Their skills include: ${skills.join(', ')}.`
-      }],
-      response_format: { type: 'json_object' }
-    });
-
-    const parsed = JSON.parse(completion.choices[0].message.content);
-    const stats = parsed.stats || parsed;
-    res.json({ stats: Array.isArray(stats) ? stats.slice(0, 3) : [] });
+    const variant = await generateAIVariant(openai, personData);
+    res.json(variant);
   } catch (err) {
-    console.error('Stats generation error:', err.message);
-    res.status(500).json({ error: 'Failed to generate stats' });
+    console.error('Card generation error:', err.message);
+    res.status(500).json({ error: 'Failed to generate card content' });
   }
 });
 
-// Enhance uploaded photo: gpt-image-1 stylized portrait (photo → portrait directly)
-router.post('/enhance-photo', async (req, res) => {
-  const { photo, name, title } = req.body;
-  const openai = getOpenAI();
+// ── Multi-variant generation ──
 
-  if (!openai || !photo) {
-    return res.json({ image: null });
-  }
-
-  try {
-    const prompt = `A stylized premium trading card portrait of ${name}, ${title}. Dramatic collectible card style with rich gold and dark tones, cinematic rim lighting, intense atmosphere. Upper body portrait, facing the viewer.`;
-
-    // Convert data URL to File object for the SDK
-    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer = Buffer.from(base64Data, 'base64');
-    const { toFile } = require('openai');
-    const imageFile = await toFile(imageBuffer, 'photo.png', { type: 'image/png' });
-
-    const result = await openai.images.edit({
-      model: 'gpt-image-1',
-      image: imageFile,
-      prompt,
-      size: '1024x1024',
-      quality: 'low',
-    });
-
-    const dataUrl = `data:image/png;base64,${result.data[0].b64_json}`;
-    res.json({ image: dataUrl });
-  } catch (err) {
-    console.error('Photo enhancement error:', err.message);
-    res.json({ image: null });
-  }
-});
-
-// Generate AI headshot via DALL-E
-router.post('/generate-image', async (req, res) => {
-  const { description } = req.body;
-  const openai = getOpenAI();
-
-  if (!openai) {
-    return res.json({ image: null, message: 'AI not available. Please upload a photo instead.' });
-  }
-
-  try {
-    const response = await openai.images.generate({
-      model: 'dall-e-3',
-      prompt: `Professional corporate headshot portrait of ${description}. Clean background, studio lighting, business attire, photorealistic style. Suitable for a premium trading card.`,
-      n: 1,
-      size: '1024x1024',
-      quality: 'standard'
-    });
-
-    // Fetch the image and convert to base64 data URL to avoid client-side CORS issues
-    const imageUrl = response.data[0].url;
-    const imgResp = await fetch(imageUrl);
-    const arrBuf = await imgResp.arrayBuffer();
-    const base64 = Buffer.from(arrBuf).toString('base64');
-    const dataUrl = `data:image/png;base64,${base64}`;
-
-    res.json({ image: dataUrl });
-  } catch (err) {
-    console.error('Image generation error:', err.message);
-    res.status(500).json({ error: 'Failed to generate image' });
-  }
-});
-
-// ── Multi-Portrait via Render Workflows + Object Storage ──
-
-const PORTRAIT_STYLES = [
-  'Dramatic collectible card style with rich gold and dark tones, cinematic rim lighting, intense atmosphere',
-  'Premium card portrait with warm cinematic lighting, rich amber and dark tones, refined detail',
-  'Bold collectible card style with deep shadows, golden accents, sharp dramatic lighting',
-];
-
-router.post('/enhance-photo-multi', async (req, res) => {
-  const { photo, name, title } = req.body;
+router.post('/generate-card-multi', async (req, res) => {
+  const personData = req.body;
   const render = getRender();
+  const openai = getOpenAI();
 
-  if (!process.env.OPENAI_API_KEY || !render || !photo) {
-    return res.status(400).json({ error: 'AI or Workflows not available' });
-  }
+  cleanExpiredSessions();
 
-  try {
-    // Upload photo to object storage via SDK
-    const objectKey = `portraits/${crypto.randomUUID()}.png`;
-    const base64Data = photo.replace(/^data:image\/\w+;base64,/, '');
-    const imageBuffer = Buffer.from(base64Data, 'base64');
+  // Path 1: Render Workflows — fan out 3 parallel tasks
+  if (render) {
+    try {
+      const sessionId = crypto.randomUUID();
+      const workflowSlug = process.env.RENDER_WORKFLOW_SLUG || 'rendervous-cards-workflow';
+      const session = { createdAt: Date.now(), status: 'pending', variants: [], taskRunIds: [] };
+      variantSessions.set(sessionId, session);
 
-    console.log(`[portraits] Uploading photo to object storage: ${objectKey} (${imageBuffer.length} bytes)`);
-    await render.experimental.storage.objects.put({
-      key: objectKey,
-      data: imageBuffer,
-    });
-    console.log(`[portraits] Upload complete`);
+      // Start 3 parallel workflow tasks
+      const taskPromises = Array.from({ length: 3 }, () =>
+        render.workflows.runTask(`${workflowSlug}/generate-card-content`, [personData])
+      );
 
-    // Create session in pending state
-    const sessionId = crypto.randomUUID();
-    portraitSessions.set(sessionId, {
-      status: 'pending',
-      createdAt: Date.now(),
-    });
+      const taskRuns = await Promise.all(taskPromises);
+      session.taskRunIds = taskRuns.map(tr => tr.id);
 
-    // Start 3 workflow tasks via SDK
-    const runs = await Promise.all(
-      PORTRAIT_STYLES.map(style =>
-        render.workflows.startTask('render-cards-workflow/generate-verified-portrait', [objectKey, name, title, style])
-      )
-    );
-    const taskRunIds = runs.map(r => r.taskRunId);
-    console.log(`[portraits] Started 3 tasks: ${taskRunIds.join(', ')}`);
-
-    // Wait for all 3 in background, each via its own SSE stream
-    (async () => {
-      try {
-        const results = await Promise.all(runs.map(r => r.get()));
-
-        console.log(`[portraits] All 3 completed for session ${sessionId}`);
-        const session = portraitSessions.get(sessionId);
-        if (!session) return;
-
-        // Results are object storage keys — download via SDK
-        const resultKeys = results.map(r => r.results?.[0] || r.results);
-        console.log(`[portraits] Downloading results: ${resultKeys.join(', ')}`);
-
-        const images = await Promise.all(resultKeys.map(async (key) => {
-          try {
-            const obj = await render.experimental.storage.objects.get({ key });
-            return `data:image/png;base64,${obj.data.toString('base64')}`;
-          } catch (err) {
-            console.error(`[portraits] Failed to download result ${key}: ${err.message}`);
-            return null;
-          }
-        }));
-
+      // Collect results in the background
+      Promise.all(taskRuns.map(async (taskRun) => {
+        const completed = await taskRun.get();
+        return completed.results;
+      })).then(results => {
         session.status = 'ready';
-        session.images = images;
+        session.variants = results;
+      }).catch(err => {
+        console.error('Workflow task error:', err.message);
+        session.status = 'error';
+        session.error = 'Workflow tasks failed';
+      });
 
-        // Clean up all objects (source photo + result portraits)
-        const keysToDelete = [objectKey, ...resultKeys];
-        for (const key of keysToDelete) {
-          render.experimental.storage.objects.delete({ key }).catch(() => {});
-        }
-      } catch (err) {
-        console.error(`[portraits] Error: ${err.message}`);
-        const session = portraitSessions.get(sessionId);
-        if (session) {
-          session.status = 'failed';
-          session.error = err.message;
-        }
+      return res.json({ sessionId });
+    } catch (err) {
+      console.error('Workflow start error, falling back:', err.message);
+      // Fall through to sequential generation
+    }
+  }
+
+  // Path 2: Sequential AI generation (no Workflows)
+  if (openai) {
+    try {
+      const variants = [];
+      for (let i = 0; i < 3; i++) {
+        variants.push(await generateAIVariant(openai, personData));
       }
-    })();
-
-    res.json({ sessionId });
-  } catch (err) {
-    console.error('Multi-portrait error:', err.message, err.stack);
-    res.status(500).json({ error: 'Failed to generate portraits' });
+      return res.json({ status: 'ready', variants });
+    } catch (err) {
+      console.error('Sequential AI generation error:', err.message);
+      // Fall through to random
+    }
   }
+
+  // Path 3: Random fallback
+  const variants = Array.from({ length: 3 }, () => generateRandomVariant(personData.emoji));
+  res.json({ status: 'ready', variants });
 });
 
-router.get('/portraits/:sessionId', (req, res) => {
-  const session = portraitSessions.get(req.params.sessionId);
+// Poll for variant results
+router.get('/variants/:sessionId', (req, res) => {
+  const session = variantSessions.get(req.params.sessionId);
   if (!session) {
-    return res.status(404).json({ error: 'Session expired or not found' });
+    return res.status(404).json({ error: 'Session not found' });
   }
-  if (session.status === 'pending') {
-    return res.json({ status: 'pending' });
-  }
-  if (session.status === 'failed') {
-    return res.status(500).json({ status: 'failed', error: session.error });
-  }
-  res.json({ status: 'ready', images: session.images });
-});
 
-router.get('/portraits/:sessionId/:index', (req, res) => {
-  const session = portraitSessions.get(req.params.sessionId);
-  if (!session) {
-    return res.status(404).json({ error: 'Session expired or not found' });
+  if (session.status === 'ready') {
+    variantSessions.delete(req.params.sessionId);
+    return res.json({ status: 'ready', variants: session.variants });
   }
-  if (session.status !== 'ready') {
-    return res.status(400).json({ error: 'Portraits not ready yet' });
+
+  if (session.status === 'error') {
+    variantSessions.delete(req.params.sessionId);
+    return res.json({ status: 'error', error: session.error });
   }
-  const idx = parseInt(req.params.index, 10);
-  if (isNaN(idx) || idx < 0 || idx >= session.images.length) {
-    return res.status(400).json({ error: 'Invalid index' });
-  }
-  res.json({ image: session.images[idx] });
+
+  res.json({ status: 'pending' });
 });
 
 // ── Card Persistence Routes ──
@@ -277,17 +227,24 @@ router.get('/portraits/:sessionId/:index', (req, res) => {
 // Save card PNG + metadata
 router.post('/cards', async (req, res) => {
   try {
-    const { name, title, skills, stats, photo_url, image } = req.body;
+    const { name, role, funTitle, tagline, responses, stats, image } = req.body;
 
-    if (!name || !title || !image) {
-      return res.status(400).json({ error: 'name, title, and image are required' });
+    if (!name || !image) {
+      return res.status(400).json({ error: 'name and image are required' });
     }
 
     const result = await pool.query(
-      `INSERT INTO cards (name, title, skills, stats, photo_url)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO cards (name, title, fun_title, tagline, responses, stats)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING id`,
-      [name, title, JSON.stringify(skills || []), JSON.stringify(stats || []), photo_url || null]
+      [
+        name,
+        role || '',
+        funTitle || '',
+        tagline || '',
+        JSON.stringify(responses || {}),
+        JSON.stringify(stats || []),
+      ]
     );
 
     const id = result.rows[0].id;
@@ -308,7 +265,7 @@ router.post('/cards', async (req, res) => {
 router.get('/cards', async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, name, title, created_at FROM cards ORDER BY created_at DESC'
+      'SELECT id, name, title, fun_title, created_at FROM cards ORDER BY created_at DESC'
     );
     res.json(result.rows);
   } catch (err) {

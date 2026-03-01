@@ -3,57 +3,92 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Render Stat Card</title>
+  <title>Rendervous Card</title>
   <link rel="stylesheet" href="/css/card.css">
 </head>
 <body>
   <div class="page-wrapper">
     <!-- Card (captured to PNG) -->
     <div class="card-container" id="card">
-      <div class="card-border"></div>
-      <div class="corner corner--tl"></div>
-      <div class="corner corner--tr"></div>
-      <div class="corner corner--bl"></div>
-      <div class="corner corner--br"></div>
+      <!-- Holographic border -->
+      <div class="card-holo-border"></div>
 
-      <div class="card-inner">
+      <!-- Inner card surface -->
+      <div class="card-surface">
+        <!-- Subtle wave texture overlay -->
+        <div class="card-texture"></div>
+
+        <!-- Top bar: name + emoji -->
+        <div class="card-header">
+          <div class="card-name" id="card-name">NAME</div>
+          <div class="card-emoji" id="card-emoji"></div>
+        </div>
+
+        <!-- Fun title -->
+        <div class="card-fun-title" id="card-fun-title">Fun Title</div>
+
+        <!-- Photo -->
         <div class="photo-frame">
           <img id="card-photo" src="" alt="Photo">
         </div>
 
-        <div class="card-name" id="card-name">NAME</div>
-        <div class="card-title" id="card-title">TITLE</div>
+        <!-- Role type badge -->
+        <div class="role-badge" id="card-role">Role</div>
 
-        <div class="stats-section" id="stats-section">
+        <!-- Fun fields -->
+        <div class="card-fields">
+          <div class="card-field">
+            <span class="field-icon">&#9889;</span>
+            <span class="field-text" id="field-superpower">Mundane superpower</span>
+          </div>
+          <div class="card-field">
+            <span class="field-icon">&#127965;</span>
+            <span class="field-text" id="field-island">Desert island items</span>
+          </div>
+          <div class="card-field">
+            <span class="field-icon">&#128293;</span>
+            <span class="field-text" id="field-hot-take">Hot take</span>
+          </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="stats-section">
           <div class="stat-row">
             <span class="stat-label" id="stat-label-0">STAT</span>
+            <div class="stat-bar-track">
+              <div class="stat-bar-fill" id="stat-bar-0"></div>
+            </div>
             <span class="stat-value" id="stat-value-0">99</span>
           </div>
           <div class="stat-row">
             <span class="stat-label" id="stat-label-1">STAT</span>
+            <div class="stat-bar-track">
+              <div class="stat-bar-fill" id="stat-bar-1"></div>
+            </div>
             <span class="stat-value" id="stat-value-1">99</span>
           </div>
           <div class="stat-row">
             <span class="stat-label" id="stat-label-2">STAT</span>
+            <div class="stat-bar-track">
+              <div class="stat-bar-fill" id="stat-bar-2"></div>
+            </div>
             <span class="stat-value" id="stat-value-2">99</span>
           </div>
         </div>
 
-        <div class="skills-section">
-          <div class="skills-header">Top Skills</div>
-          <div class="skill-item" id="skill-0">Skill 1</div>
-          <div class="skill-item" id="skill-1">Skill 2</div>
-          <div class="skill-item" id="skill-2">Skill 3</div>
-        </div>
-      </div>
+        <!-- Tagline / flavor text -->
+        <div class="card-tagline" id="card-tagline">"Flavor text goes here."</div>
 
-      <div class="card-watermark">Render</div>
+        <!-- Watermark -->
+        <div class="card-watermark">Rendervous &rsquo;25</div>
+      </div>
     </div>
 
     <!-- Actions (outside card, not captured) -->
     <div class="actions">
       <button class="btn" onclick="window.location.href='/'">Back</button>
-      <button class="btn btn--primary" id="download-btn">Download PNG</button>
+      <button class="btn btn--regen" id="regen-btn">Regenerate</button>
+      <button class="btn btn--primary" id="save-btn">Save &amp; Download</button>
       <button class="btn" onclick="window.location.href='/gallery.html'">Gallery</button>
     </div>
     <div class="save-status" id="save-status"></div>
