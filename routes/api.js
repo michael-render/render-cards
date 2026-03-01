@@ -156,26 +156,24 @@ router.post('/generate-card-multi', async (req, res) => {
       const session = { createdAt: Date.now(), status: 'pending', variants: [], taskRunIds: [] };
       variantSessions.set(sessionId, session);
 
-      // Start 3 parallel workflow tasks
-      const taskPromises = Array.from({ length: 3 }, () =>
-        render.workflows.runTask(`${workflowSlug}/generate-card-content`, [personData])
+      // Start 3 parallel workflow tasks (startTask returns immediately)
+      const taskResults = Array.from({ length: 3 }, () =>
+        render.workflows.startTask(`${workflowSlug}/generate-card-content`, [personData])
       );
 
-      const taskRuns = await Promise.all(taskPromises);
-      session.taskRunIds = taskRuns.map(tr => tr.id);
+      const taskRunResults = await Promise.all(taskResults);
 
-      // Collect results in the background
-      Promise.all(taskRuns.map(async (taskRun, i) => {
-        console.log(`[workflow] Task ${i} started, id=${taskRun.id}`);
-        const completed = await taskRun.get();
-        console.log(`[workflow] Task ${i} completed, status=${completed.status}, keys=${Object.keys(completed)}`);
+      // Collect results in the background via .get()
+      Promise.all(taskRunResults.map(async (trr, i) => {
+        const completed = await trr.get();
+        console.log(`[workflow] Task ${i} done, status=${completed.status}`);
         return completed.results;
       })).then(results => {
         console.log(`[workflow] All tasks done, variants=${results.length}`);
         session.status = 'ready';
         session.variants = results;
       }).catch(err => {
-        console.error(`[workflow] Task error: ${err.message}`, err.stack);
+        console.error(`[workflow] Task error: ${err.message}`);
         session.status = 'error';
         session.error = 'Workflow tasks failed';
       });
