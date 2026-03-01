@@ -168,16 +168,15 @@ router.post('/generate-card-multi', async (req, res) => {
       );
 
       const taskRunResults = await Promise.all(taskResults);
+      console.log('[workflow] Task run IDs:', taskRunResults.map(trr => trr.taskRunId));
 
       // Collect results in the background via .get()
       Promise.all(taskRunResults.map(async (trr, i) => {
         const completed = await trr.get();
-        console.log(`[workflow] Task ${i} done:`, JSON.stringify({
+        console.log(`[workflow] Task ${i} (${trr.taskRunId}) done:`, JSON.stringify({
           status: completed.status,
           hasResults: !!completed.results,
           resultsLength: completed.results?.length,
-          error: completed.error,
-          errorMessage: completed.errorMessage,
         }));
         if (!completed.results || !completed.results[0]) {
           throw new Error(`Task ${i} returned no results (status=${completed.status}, error=${completed.error || completed.errorMessage || 'unknown'})`);

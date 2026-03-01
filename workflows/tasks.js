@@ -1,11 +1,5 @@
 const { task, startTaskServer } = require('@renderinc/sdk/workflows');
 
-console.log('[workflow] tasks.js loading', {
-  mode: process.env.RENDER_SDK_MODE,
-  socketPath: process.env.RENDER_SDK_SOCKET_PATH,
-  hasOpenAI: !!process.env.OPENAI_API_KEY,
-});
-
 function getOpenAI() {
   if (!process.env.OPENAI_API_KEY) return null;
   const OpenAI = require('openai');
@@ -13,7 +7,6 @@ function getOpenAI() {
 }
 
 task({ name: 'generate-card-content' }, async (personData) => {
-  console.log('[workflow] Task executing, personData keys:', Object.keys(personData || {}));
   const { name, role, hobby, unpopularOpinion, workHack, emoji, desertIsland, superpower, motivation } = personData;
   const openai = getOpenAI();
 
