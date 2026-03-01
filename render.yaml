@@ -4,6 +4,16 @@ databases:
     databaseName: render_cards
 
 services:
+  - type: workflow
+    runtime: node
+    name: rendervous-cards-workflow
+    plan: starter
+    buildCommand: npm ci
+    startCommand: node workflows/tasks.js
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+
   - type: web
     runtime: node
     name: rendervous-cards
