@@ -99,48 +99,80 @@ document.addEventListener('DOMContentLoaded', () => {
       motivation: document.getElementById('motivation').value.trim(),
     };
 
+    // Save form state so "Back" restores entries
+    const formState = { name, role, ...responses, photoDataUrl };
+
     try {
-      // Generate AI card content (fun title, tagline, stats)
-      status.textContent = 'Generating your card...';
-      const res = await fetch('/api/generate-card', {
+      // Try multi-variant generation first (3 variants → pick page)
+      status.textContent = 'Generating your card variants...';
+      const multiRes = await fetch('/api/generate-card-multi', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, role, ...responses })
+        body: JSON.stringify({ name, role, ...responses }),
       });
 
-      if (!res.ok) throw new Error('Failed to generate card');
-      const cardContent = await res.json();
+      if (!multiRes.ok) throw new Error('multi-failed');
+      const multiData = await multiRes.json();
 
-      // Store data and navigate
-      const cardData = {
+      // Build pick session with shared person info
+      const pickSession = {
         name,
         role,
         photo: photoDataUrl,
         responses,
-        funTitle: cardContent.funTitle,
-        tagline: cardContent.tagline,
-        resolvedEmoji: cardContent.resolvedEmoji,
-        stats: cardContent.stats,
       };
 
-      sessionStorage.setItem('cardData', JSON.stringify(cardData));
+      if (multiData.sessionId) {
+        // Workflow path — poll on pick page
+        pickSession.sessionId = multiData.sessionId;
+      } else if (multiData.variants) {
+        // Synchronous fallback — embed variants directly
+        pickSession.variants = multiData.variants;
+      }
 
-      // Save form state so "Back" restores entries
-      sessionStorage.setItem('formData', JSON.stringify({
-        name, role, ...responses, photoDataUrl,
-      }));
+      sessionStorage.setItem('pickSession', JSON.stringify(pickSession));
+      sessionStorage.setItem('formData', JSON.stringify(formState));
+      window.location.href = '/pick.html';
 
-      window.location.href = '/card.html';
+    } catch (multiErr) {
+      // Fallback: single variant → card.html directly
+      console.warn('Multi-variant failed, falling back to single:', multiErr.message);
+      try {
+        status.textContent = 'Generating your card...';
+        const res = await fetch('/api/generate-card', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, role, ...responses }),
+        });
 
-    } catch (err) {
-      console.error(err);
-      const msg = err.name === 'QuotaExceededError'
-        ? 'Photo is too large. Please use a smaller image.'
-        : 'Something went wrong. Please try again.';
-      status.textContent = msg;
-      status.className = 'status error';
-      btn.disabled = false;
-      btn.textContent = 'Generate Card';
+        if (!res.ok) throw new Error('Failed to generate card');
+        const cardContent = await res.json();
+
+        const cardData = {
+          name,
+          role,
+          photo: photoDataUrl,
+          responses,
+          funTitle: cardContent.funTitle,
+          tagline: cardContent.tagline,
+          resolvedEmoji: cardContent.resolvedEmoji,
+          stats: cardContent.stats,
+        };
+
+        sessionStorage.setItem('cardData', JSON.stringify(cardData));
+        sessionStorage.setItem('formData', JSON.stringify(formState));
+        window.location.href = '/card.html';
+
+      } catch (singleErr) {
+        console.error(singleErr);
+        const msg = singleErr.name === 'QuotaExceededError'
+          ? 'Photo is too large. Please use a smaller image.'
+          : 'Something went wrong. Please try again.';
+        status.textContent = msg;
+        status.className = 'status error';
+        btn.disabled = false;
+        btn.textContent = 'Generate Card';
+      }
     }
   });
 });

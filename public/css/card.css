@@ -1,18 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&family=Raleway:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  --teal: #06D6A0;
-  --teal-dim: #04a87d;
-  --teal-glow: rgba(6, 214, 160, 0.25);
-  --coral: #FF6B6B;
-  --gold: #FFD93D;
-  --ocean-dark: #0B1622;
-  --ocean-mid: #0F2033;
-  --ocean-deep: #071018;
-  --sand: #F4E8C1;
-  --sand-dim: #c4b898;
-  --text-primary: #E8F4F0;
-  --text-secondary: #8BA5A0;
+  /* Render brand palette */
+  --render-navy: #181B38;
+  --render-navy-light: #1E2247;
+  --render-navy-deep: #12142D;
+  --render-purple: #4351E8;
+  --render-purple-light: #6570F0;
+  --render-purple-dim: #343FBF;
+  --render-purple-glow: rgba(67, 81, 232, 0.25);
+
+  /* Render icon gradient stops */
+  --grad-red: #e71a43;
+  --grad-magenta: #e817c9;
+  --grad-purple: #c416e9;
+  --grad-violet: #9a3bf1;
+  --grad-blue: #3892f3;
+
+  /* Functional */
+  --text-primary: #EEEEF4;
+  --text-secondary: #8B8EA8;
+  --text-dim: #5D6080;
+  --surface: rgba(255, 255, 255, 0.04);
 }
 
 * {
@@ -22,13 +31,13 @@
 }
 
 body {
-  background: var(--ocean-deep);
+  background: var(--render-navy-deep);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  font-family: 'Raleway', sans-serif;
+  font-family: 'Inter', -apple-system, system-ui, sans-serif;
   color: var(--text-primary);
 }
 
@@ -50,30 +59,28 @@ body {
   border-radius: 20px;
   overflow: hidden;
   box-shadow:
-    0 0 30px var(--teal-glow),
-    0 0 80px rgba(6, 214, 160, 0.08),
-    0 12px 40px rgba(0, 0, 0, 0.7);
+    0 0 40px rgba(67, 81, 232, 0.15),
+    0 0 80px rgba(154, 59, 241, 0.06),
+    0 16px 48px rgba(0, 0, 0, 0.6);
 }
 
-/* ── Holographic Rainbow Border ── */
+/* ── Render Gradient Border ── */
 .card-holo-border {
   position: absolute;
   inset: 0;
   border-radius: 20px;
   padding: 4px;
   background: conic-gradient(
-    from 0deg,
-    var(--teal),
-    #3B82F6,
-    #A855F7,
-    var(--coral),
-    var(--gold),
-    var(--teal),
-    #3B82F6,
-    #A855F7,
-    var(--coral),
-    var(--gold),
-    var(--teal)
+    from 180deg,
+    var(--grad-blue),
+    var(--grad-violet),
+    var(--grad-purple),
+    var(--grad-magenta),
+    var(--grad-red),
+    var(--grad-magenta),
+    var(--grad-purple),
+    var(--grad-violet),
+    var(--grad-blue)
   );
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
@@ -96,25 +103,21 @@ body {
   display: flex;
   flex-direction: column;
   background:
-    linear-gradient(175deg, var(--ocean-mid) 0%, var(--ocean-dark) 50%, var(--ocean-deep) 100%);
+    linear-gradient(175deg, var(--render-navy-light) 0%, var(--render-navy) 50%, var(--render-navy-deep) 100%);
   border-radius: 20px;
   z-index: 1;
 }
 
-/* ── Subtle Wave Texture ── */
+/* ── Subtle Grid Texture (Render's blueprint grid pattern) ── */
 .card-texture {
   position: absolute;
   inset: 0;
   border-radius: 20px;
-  opacity: 0.035;
+  opacity: 0.025;
   background-image:
-    repeating-linear-gradient(
-      -45deg,
-      transparent,
-      transparent 8px,
-      var(--teal) 8px,
-      var(--teal) 9px
-    );
+    linear-gradient(var(--render-purple) 1px, transparent 1px),
+    linear-gradient(90deg, var(--render-purple) 1px, transparent 1px);
+  background-size: 24px 24px;
   pointer-events: none;
 }
 
@@ -127,7 +130,7 @@ body {
   transform: translateX(-50%);
   width: 300px;
   height: 200px;
-  background: radial-gradient(ellipse, rgba(6, 214, 160, 0.06) 0%, transparent 70%);
+  background: radial-gradient(ellipse, rgba(67, 81, 232, 0.06) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -143,11 +146,11 @@ body {
 }
 
 .card-name {
-  font-family: 'Oswald', sans-serif;
-  font-size: 32px;
-  font-weight: 700;
+  font-family: 'Inter', sans-serif;
+  font-size: 30px;
+  font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 1.5px;
+  letter-spacing: 1px;
   line-height: 1.1;
   color: var(--text-primary);
   white-space: nowrap;
@@ -166,12 +169,15 @@ body {
    FUN TITLE
    ══════════════════════════════════════ */
 .card-fun-title {
-  font-family: 'Raleway', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 2.5px;
-  color: var(--teal);
+  letter-spacing: 3px;
+  background: linear-gradient(90deg, var(--grad-red), var(--grad-magenta), var(--grad-purple), var(--grad-blue));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   margin-bottom: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -188,9 +194,9 @@ body {
   overflow: hidden;
   margin-bottom: 10px;
   position: relative;
-  border: 2px solid rgba(6, 214, 160, 0.3);
+  border: 2px solid rgba(67, 81, 232, 0.3);
   box-shadow:
-    0 0 16px rgba(6, 214, 160, 0.12),
+    0 0 16px rgba(67, 81, 232, 0.1),
     inset 0 0 20px rgba(0, 0, 0, 0.3);
 }
 
@@ -202,22 +208,22 @@ body {
 }
 
 /* ══════════════════════════════════════
-   ROLE BADGE — Pokémon type badge style
+   ROLE BADGE
    ══════════════════════════════════════ */
 .role-badge {
   display: inline-block;
   align-self: flex-start;
-  font-family: 'Oswald', sans-serif;
-  font-size: 11px;
-  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2px;
-  color: var(--ocean-dark);
-  background: linear-gradient(135deg, var(--teal), var(--teal-dim));
+  color: #fff;
+  background: linear-gradient(135deg, var(--render-purple), var(--grad-violet));
   padding: 4px 14px;
   border-radius: 20px;
   margin-bottom: 12px;
-  box-shadow: 0 2px 8px rgba(6, 214, 160, 0.3);
+  box-shadow: 0 2px 12px rgba(67, 81, 232, 0.3);
 }
 
 /* ══════════════════════════════════════
@@ -236,9 +242,17 @@ body {
   align-items: flex-start;
   gap: 8px;
   padding: 5px 10px;
-  background: rgba(6, 214, 160, 0.04);
-  border-left: 2px solid var(--teal);
+  background: var(--surface);
+  border-left: 2px solid var(--render-purple);
   border-radius: 0 6px 6px 0;
+}
+
+.card-field:nth-child(2) {
+  border-left-color: var(--grad-violet);
+}
+
+.card-field:nth-child(3) {
+  border-left-color: var(--grad-magenta);
 }
 
 .field-icon {
@@ -248,7 +262,7 @@ body {
 }
 
 .field-text {
-  font-family: 'Raleway', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 11.5px;
   font-weight: 400;
   color: var(--text-secondary);
@@ -260,7 +274,7 @@ body {
 }
 
 /* ══════════════════════════════════════
-   STATS — Pokémon-style stat bars
+   STATS — Stat bars with Render gradient colors
    ══════════════════════════════════════ */
 .stats-section {
   width: 100%;
@@ -277,7 +291,7 @@ body {
 }
 
 .stat-label {
-  font-family: 'Raleway', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -291,7 +305,7 @@ body {
 .stat-bar-track {
   flex: 1;
   height: 8px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 4px;
   overflow: hidden;
 }
@@ -299,23 +313,23 @@ body {
 .stat-bar-fill {
   height: 100%;
   border-radius: 4px;
-  background: linear-gradient(90deg, var(--teal-dim), var(--teal));
+  background: linear-gradient(90deg, var(--render-purple-dim), var(--render-purple-light));
   transition: width 0.6s ease;
 }
 
 /* Color variations for stat bars */
 .stat-row:nth-child(2) .stat-bar-fill {
-  background: linear-gradient(90deg, #3B82F6, #60A5FA);
+  background: linear-gradient(90deg, var(--grad-violet), var(--grad-blue));
 }
 
 .stat-row:nth-child(3) .stat-bar-fill {
-  background: linear-gradient(90deg, #A855F7, #C084FC);
+  background: linear-gradient(90deg, var(--grad-red), var(--grad-magenta));
 }
 
 .stat-value {
-  font-family: 'Oswald', sans-serif;
-  font-size: 16px;
-  font-weight: 600;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text-primary);
   width: 28px;
   text-align: right;
@@ -326,11 +340,11 @@ body {
    TAGLINE — Flavor text
    ══════════════════════════════════════ */
 .card-tagline {
-  font-family: 'Raleway', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 11px;
   font-weight: 400;
   font-style: italic;
-  color: var(--sand-dim);
+  color: var(--text-dim);
   text-align: center;
   line-height: 1.4;
   padding: 0 12px;
@@ -348,12 +362,12 @@ body {
   position: absolute;
   bottom: 10px;
   right: 16px;
-  font-family: 'Oswald', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 9px;
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: rgba(6, 214, 160, 0.2);
+  color: rgba(67, 81, 232, 0.25);
   z-index: 2;
 }
 
@@ -369,24 +383,23 @@ body {
 }
 
 .btn {
-  font-family: 'Raleway', sans-serif;
+  font-family: 'Inter', sans-serif;
   font-size: 13px;
   font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
+  letter-spacing: 0.5px;
   padding: 10px 22px;
-  border: 2px solid rgba(6, 214, 160, 0.4);
+  border: 1px solid rgba(67, 81, 232, 0.4);
   border-radius: 8px;
   background: transparent;
-  color: var(--teal);
+  color: var(--render-purple-light);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn:hover {
-  background: rgba(6, 214, 160, 0.08);
-  border-color: var(--teal);
-  box-shadow: 0 0 16px rgba(6, 214, 160, 0.15);
+  background: rgba(67, 81, 232, 0.08);
+  border-color: var(--render-purple);
+  box-shadow: 0 0 16px var(--render-purple-glow);
 }
 
 .btn:disabled {
@@ -395,33 +408,33 @@ body {
 }
 
 .btn--primary {
-  background: linear-gradient(135deg, var(--teal-dim), var(--teal));
-  color: var(--ocean-dark);
+  background: var(--render-purple);
+  color: #fff;
   border-color: transparent;
   font-weight: 700;
 }
 
 .btn--primary:hover {
-  background: linear-gradient(135deg, var(--teal), #2EFCB8);
-  box-shadow: 0 0 24px var(--teal-glow);
+  background: var(--render-purple-light);
+  box-shadow: 0 0 24px var(--render-purple-glow);
 }
 
 .btn--regen {
-  border-color: rgba(168, 85, 247, 0.4);
-  color: #C084FC;
+  border-color: rgba(154, 59, 241, 0.4);
+  color: var(--grad-violet);
 }
 
 .btn--regen:hover {
-  background: rgba(168, 85, 247, 0.08);
-  border-color: #A855F7;
-  box-shadow: 0 0 16px rgba(168, 85, 247, 0.15);
+  background: rgba(154, 59, 241, 0.08);
+  border-color: var(--grad-violet);
+  box-shadow: 0 0 16px rgba(154, 59, 241, 0.15);
 }
 
 /* ── Save Status ── */
 .save-status {
   font-size: 12px;
   color: var(--text-secondary);
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
   text-align: center;
   margin-top: 4px;
   opacity: 0;

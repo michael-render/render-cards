@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Choose Your Card</title>
+  <link rel="stylesheet" href="/css/pick.css">
+</head>
+<body>
+  <div class="pick-wrapper">
+    <div class="pick-header">
+      <h1>Pick Your Card</h1>
+      <p>We generated 3 variants — choose your favorite</p>
+    </div>
+
+    <div class="pick-status" id="pick-status">
+      <div class="spinner"></div>
+      <span>Generating variants...</span>
+    </div>
+
+    <div class="variants" id="variants"></div>
+
+    <div class="pick-actions">
+      <button class="btn-back" onclick="window.location.href='/'">Back</button>
+    </div>
+  </div>
+
+  <script src="/js/pick.js"></script>
+</body>
+</html>
