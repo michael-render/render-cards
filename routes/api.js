@@ -146,6 +146,12 @@ router.post('/generate-card-multi', async (req, res) => {
   const render = getRender();
   const openai = getOpenAI();
 
+  console.log('[multi] Generate request:', {
+    hasRender: !!render,
+    hasOpenAI: !!openai,
+    hasRenderKey: !!process.env.RENDER_API_KEY,
+  });
+
   cleanExpiredSessions();
 
   // Path 1: Render Workflows — fan out 3 parallel tasks
