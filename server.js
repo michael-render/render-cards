@@ -26,6 +26,7 @@ async function start() {
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Rendervous Cards running on port ${PORT}`);
     console.log(`AI features: ${process.env.OPENAI_API_KEY ? 'enabled' : 'disabled'}`);
+    console.log(`Workflows: ${process.env.RENDER_API_KEY ? 'enabled' : 'disabled'}`);
     console.log(`Card storage: ${storagePath}`);
   });
 }
