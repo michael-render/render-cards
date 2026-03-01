@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       const el = document.createElement('div');
       el.className = 'gallery-card';
       el.innerHTML = `
-        <img src="/api/cards/${card.id}/image" alt="${card.name}" loading="lazy">
+        <img src="/api/cards/${card.id}/thumbnail" alt="${card.name}" loading="lazy">
         <div class="gallery-card-info">
           <div class="gallery-card-name">${card.name}</div>
           <div class="gallery-card-title">${card.fun_title || card.title}</div>

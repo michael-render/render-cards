@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+const sharp = require('sharp');
 const { pool } = require('../db');
 const router = express.Router();
 
@@ -251,8 +252,15 @@ router.post('/cards', async (req, res) => {
 
     // Decode base64 PNG and write to disk
     const base64Data = image.replace(/^data:image\/png;base64,/, '');
+    const buf = Buffer.from(base64Data, 'base64');
     const filePath = path.join(storagePath, `${id}.png`);
-    fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+    fs.writeFileSync(filePath, buf);
+
+    // Generate thumbnail for gallery (300px wide)
+    const thumbPath = path.join(storagePath, `${id}_thumb.png`);
+    sharp(buf).resize(300).png({ quality: 80 }).toFile(thumbPath).catch(err => {
+      console.error('Thumbnail generation error:', err.message);
+    });
 
     res.json({ id });
   } catch (err) {
@@ -283,6 +291,19 @@ router.get('/cards/:id/image', (req, res) => {
   res.sendFile(filePath);
 });
 
+// Serve thumbnail (falls back to full image if thumbnail doesn't exist)
+router.get('/cards/:id/thumbnail', (req, res) => {
+  const thumbPath = path.join(storagePath, `${req.params.id}_thumb.png`);
+  if (fs.existsSync(thumbPath)) {
+    return res.sendFile(thumbPath);
+  }
+  const filePath = path.join(storagePath, `${req.params.id}.png`);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ error: 'Image not found' });
+  }
+  res.sendFile(filePath);
+});
+
 // Delete a card
 router.delete('/cards/:id', async (req, res) => {
   try {
@@ -291,9 +312,9 @@ router.delete('/cards/:id', async (req, res) => {
       return res.status(404).json({ error: 'Card not found' });
     }
     const filePath = path.join(storagePath, `${req.params.id}.png`);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    const thumbPath = path.join(storagePath, `${req.params.id}_thumb.png`);
+    if (fs.existsSync(thumbPath)) fs.unlinkSync(thumbPath);
     res.json({ success: true });
   } catch (err) {
     console.error('Delete card error:', err.message);
