@@ -167,7 +167,7 @@ router.post('/generate-card-multi', async (req, res) => {
       Promise.all(taskRunResults.map(async (trr, i) => {
         const completed = await trr.get();
         console.log(`[workflow] Task ${i} done, status=${completed.status}`);
-        return completed.results;
+        return completed.results[0];
       })).then(results => {
         console.log(`[workflow] All tasks done, variants=${results.length}`);
         session.status = 'ready';
