@@ -7,17 +7,6 @@ databases:
     databaseName: render_cards
 
 services:
-  - type: workflow
-    runtime: node
-    name: rendervous-cards-workflow
-    plan: starter
-    branch: master
-    buildCommand: npm ci
-    startCommand: node workflows/tasks.js
-    envVars:
-      - key: OPENAI_API_KEY
-        sync: false
-
   - type: web
     runtime: node
     name: rendervous-cards
@@ -41,10 +30,6 @@ services:
           property: connectionString
       - key: CARD_STORAGE_PATH
         value: /var/data/cards
-      # Render Workflows — create a workflow service manually in Dashboard
+      # Workflow service (render-cards-workflow) created manually in Dashboard
       - key: RENDER_API_KEY
         sync: false
-      - key: RENDER_OWNER_ID
-        sync: false
-      - key: RENDER_REGION
-        value: oregon

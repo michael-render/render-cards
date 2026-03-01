@@ -152,7 +152,7 @@ router.post('/generate-card-multi', async (req, res) => {
   if (render) {
     try {
       const sessionId = crypto.randomUUID();
-      const workflowSlug = process.env.RENDER_WORKFLOW_SLUG || 'rendervous-cards-workflow';
+      const workflowSlug = process.env.RENDER_WORKFLOW_SLUG || 'render-cards-workflow';
       const session = { createdAt: Date.now(), status: 'pending', variants: [], taskRunIds: [] };
       variantSessions.set(sessionId, session);
 
