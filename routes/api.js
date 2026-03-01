@@ -146,6 +146,14 @@ router.post('/generate-card-multi', async (req, res) => {
   const render = getRender();
   const openai = getOpenAI();
 
+  console.log('[generate-card-multi] path check:', {
+    hasRender: !!render,
+    hasOpenAI: !!openai,
+    workflowSlug: process.env.RENDER_WORKFLOW_SLUG || 'render-cards-workflow',
+    socketPath: process.env.RENDER_SDK_SOCKET_PATH || '(not set)',
+    localDev: process.env.RENDER_USE_LOCAL_DEV || '(not set)',
+  });
+
   cleanExpiredSessions();
 
   // Path 1: Render Workflows — fan out 3 parallel tasks
@@ -153,28 +161,42 @@ router.post('/generate-card-multi', async (req, res) => {
     try {
       const sessionId = crypto.randomUUID();
       const workflowSlug = process.env.RENDER_WORKFLOW_SLUG || 'render-cards-workflow';
+      const taskIdentifier = `${workflowSlug}/generate-card-content`;
       const session = { createdAt: Date.now(), status: 'pending', variants: [], taskRunIds: [] };
       variantSessions.set(sessionId, session);
 
+      console.log('[workflow] Starting 3 tasks with identifier:', taskIdentifier);
+
       // Start 3 parallel workflow tasks (startTask returns immediately)
       const taskResults = Array.from({ length: 3 }, () =>
-        render.workflows.startTask(`${workflowSlug}/generate-card-content`, [personData])
+        render.workflows.startTask(taskIdentifier, [personData])
       );
 
       const taskRunResults = await Promise.all(taskResults);
+      const taskRunIds = taskRunResults.map(trr => trr.taskRunId);
+      console.log('[workflow] startTask returned IDs:', taskRunIds);
 
       // Collect results in the background via .get()
       Promise.all(taskRunResults.map(async (trr, i) => {
         const completed = await trr.get();
+        console.log(`[workflow] Task ${i} (${trr.taskRunId}):`, JSON.stringify({
+          status: completed.status,
+          taskId: completed.taskId,
+          id: completed.id,
+          hasResults: completed.results != null,
+          resultsLength: completed.results?.length,
+          error: completed.error || undefined,
+        }));
         if (!completed.results || !completed.results[0]) {
           throw new Error(`Task ${i} returned no results (status=${completed.status})`);
         }
         return completed.results[0];
       })).then(results => {
+        console.log('[workflow] All 3 tasks done successfully');
         session.status = 'ready';
         session.variants = results;
       }).catch(async (err) => {
-        console.error('Workflow task error:', err.message);
+        console.error('[workflow] Task error:', err.message);
         if (process.env.USE_FALLBACK === 'true') {
           // Fall back to sequential AI or random generation
           try {
