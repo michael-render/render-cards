@@ -146,12 +146,6 @@ router.post('/generate-card-multi', async (req, res) => {
   const render = getRender();
   const openai = getOpenAI();
 
-  console.log('[multi] Generate request:', {
-    hasRender: !!render,
-    hasOpenAI: !!openai,
-    hasRenderKey: !!process.env.RENDER_API_KEY,
-  });
-
   cleanExpiredSessions();
 
   // Path 1: Render Workflows — fan out 3 parallel tasks
@@ -168,26 +162,19 @@ router.post('/generate-card-multi', async (req, res) => {
       );
 
       const taskRunResults = await Promise.all(taskResults);
-      console.log('[workflow] Task run IDs:', taskRunResults.map(trr => trr.taskRunId));
 
       // Collect results in the background via .get()
       Promise.all(taskRunResults.map(async (trr, i) => {
         const completed = await trr.get();
-        console.log(`[workflow] Task ${i} (${trr.taskRunId}) done:`, JSON.stringify({
-          status: completed.status,
-          hasResults: !!completed.results,
-          resultsLength: completed.results?.length,
-        }));
         if (!completed.results || !completed.results[0]) {
-          throw new Error(`Task ${i} returned no results (status=${completed.status}, error=${completed.error || completed.errorMessage || 'unknown'})`);
+          throw new Error(`Task ${i} returned no results (status=${completed.status})`);
         }
         return completed.results[0];
       })).then(results => {
-        console.log(`[workflow] All tasks done, variants=${results.length}`);
         session.status = 'ready';
         session.variants = results;
       }).catch(async (err) => {
-        console.error(`[workflow] Task error: ${err.message}`);
+        console.error('Workflow task error:', err.message);
         if (process.env.USE_FALLBACK === 'true') {
           // Fall back to sequential AI or random generation
           try {
