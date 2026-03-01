@@ -182,26 +182,31 @@ router.post('/generate-card-multi', async (req, res) => {
         session.status = 'ready';
         session.variants = results;
       }).catch(async (err) => {
-        console.error(`[workflow] Task error, falling back: ${err.message}`);
-        // Fall back to sequential AI or random generation
-        try {
-          const fallbackOpenai = getOpenAI();
-          if (fallbackOpenai) {
-            const fallbackVariants = [];
-            for (let i = 0; i < 3; i++) {
-              fallbackVariants.push(await generateAIVariant(fallbackOpenai, personData));
+        console.error(`[workflow] Task error: ${err.message}`);
+        if (process.env.USE_FALLBACK === 'true') {
+          // Fall back to sequential AI or random generation
+          try {
+            const fallbackOpenai = getOpenAI();
+            if (fallbackOpenai) {
+              const fallbackVariants = [];
+              for (let i = 0; i < 3; i++) {
+                fallbackVariants.push(await generateAIVariant(fallbackOpenai, personData));
+              }
+              session.status = 'ready';
+              session.variants = fallbackVariants;
+            } else {
+              session.status = 'ready';
+              session.variants = Array.from({ length: 3 }, () => generateRandomVariant(personData.emoji));
             }
-            session.status = 'ready';
-            session.variants = fallbackVariants;
-          } else {
+            console.log('[workflow] Fallback generation succeeded');
+          } catch (fallbackErr) {
+            console.error(`[workflow] Fallback also failed: ${fallbackErr.message}`);
             session.status = 'ready';
             session.variants = Array.from({ length: 3 }, () => generateRandomVariant(personData.emoji));
           }
-          console.log('[workflow] Fallback generation succeeded');
-        } catch (fallbackErr) {
-          console.error(`[workflow] Fallback also failed: ${fallbackErr.message}`);
-          session.status = 'ready';
-          session.variants = Array.from({ length: 3 }, () => generateRandomVariant(personData.emoji));
+        } else {
+          session.status = 'error';
+          session.error = 'Workflow tasks failed';
         }
       });
 
